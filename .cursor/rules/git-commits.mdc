@@ -1,0 +1,24 @@
+---
+description: Conventional Commit message format for this repo
+alwaysApply: true
+---
+
+# Git commit messages
+
+Follow Conventional Commits (English, imperative):
+
+```
+<type>(optional-scope): <summary>
+```
+
+- Summary ≤72 chars, no trailing period; focus on why
+- Optional body after a blank line
+- One logical change per commit
+
+**Types:** `feat` | `fix` | `refactor` | `style` | `docs` | `chore` | `build` | `test` | `perf`
+
+**Scopes:** `schedule` | `courses` | `stats` | `settings` | `create` | `nav` | `data` | `theme` | `ui`
+
+**Examples:** `feat(schedule): …` · `fix(schedule): …` · `docs: …` · `chore: …`
+
+Full table and examples live in `AGENTS.md` → Git commits. Prefer that format when committing unless the user gives an explicit message.

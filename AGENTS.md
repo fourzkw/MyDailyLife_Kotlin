@@ -42,6 +42,45 @@ Legacy screens (`calendar`, `items`, `completed`) may still exist but are not pr
 - Gestures: `horizontalSwipe` / `verticalSwipe` in `ui/components/Swipe.kt`.
 - Do not commit secrets, `local.properties`, or build outputs (see `.gitignore`).
 
+## Git commits
+
+Use [Conventional Commits](https://www.conventionalcommits.org/), English, imperative mood:
+
+```
+<type>(optional-scope): <summary>
+```
+
+- **Summary**: ≤72 chars; say *why* briefly; no trailing period
+- **Body** (optional): blank line after summary; wrap ~72; explain motivation when non-obvious
+- **One concern per commit**; do not mix unrelated changes
+
+| type | use for |
+|------|---------|
+| `feat` | new user-facing capability |
+| `fix` | bug fix |
+| `refactor` | code change with no behavior change |
+| `style` | UI/theme-only polish (not CSS lint) |
+| `docs` | AGENTS.md, DESIGN notes, comments-only docs |
+| `chore` | tooling, gitignore, non-code housekeeping |
+| `build` | Gradle/deps/AGP |
+| `test` | tests only |
+| `perf` | performance |
+
+**Scopes** (optional): `schedule`, `courses`, `stats`, `settings`, `create`, `nav`, `data`, `theme`, `ui`
+
+**Examples**
+
+```
+feat(schedule): expand completed section at list bottom
+fix(schedule): ignore tap when long-press is cancelled
+style(theme): soften coral primary for light canvas
+docs: add AGENTS.md for AI project context
+chore: ignore .idea and build outputs
+build: bump Compose BOM
+```
+
+When the agent creates a commit, follow this format unless the user specifies another message.
+
 ## Build
 
 ```bat
