@@ -27,6 +27,8 @@ import com.mydailylife.schedule.ui.screens.completed.CompletedViewModel
 import com.mydailylife.schedule.ui.screens.courses.CoursesScreen
 import com.mydailylife.schedule.ui.screens.create.CreateScreen
 import com.mydailylife.schedule.ui.screens.create.CreateViewModel
+import com.mydailylife.schedule.ui.screens.reminders.ReminderManageScreen
+import com.mydailylife.schedule.ui.screens.reminders.ReminderManageViewModel
 import com.mydailylife.schedule.ui.screens.schedule.ScheduleScreen
 import com.mydailylife.schedule.ui.screens.schedule.ScheduleViewModel
 import com.mydailylife.schedule.ui.screens.settings.SettingsScreen
@@ -109,6 +111,7 @@ fun MdlNavHost(
                 ScheduleScreen(
                     onCreate = { navController.navigate(Routes.create()) },
                     onEdit = { id -> navController.navigate(Routes.create(id)) },
+                    onManageReminders = { navController.navigate(Routes.Reminders) },
                     viewModel = vm,
                 )
             }
@@ -124,6 +127,19 @@ fun MdlNavHost(
                     factory = SettingsViewModel.factory(app.settingsRepository),
                 )
                 SettingsScreen(viewModel = vm)
+            }
+            composable(Routes.Reminders) {
+                val vm: ReminderManageViewModel = viewModel(
+                    factory = ReminderManageViewModel.factory(
+                        scheduleRepository = repository,
+                        settingsRepository = app.settingsRepository,
+                    ),
+                )
+                ReminderManageScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { id -> navController.navigate(Routes.create(id)) },
+                    viewModel = vm,
+                )
             }
             composable(Routes.Create) {
                 val vm: CreateViewModel = viewModel(

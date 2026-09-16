@@ -104,6 +104,7 @@ private data class WeekStripPage(
 fun ScheduleScreen(
     onCreate: () -> Unit,
     onEdit: (String) -> Unit,
+    onManageReminders: () -> Unit,
     viewModel: ScheduleViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -158,7 +159,11 @@ fun ScheduleScreen(
                 .padding(horizontal = 16.dp),
         ) {
             Spacer(modifier = Modifier.height(8.dp))
-            SectionHeader(title = "日程")
+            SectionHeader(
+                title = "日程",
+                action = "通知管理",
+                onAction = onManageReminders,
+            )
             Spacer(modifier = Modifier.height(12.dp))
 
             CalendarStrip(

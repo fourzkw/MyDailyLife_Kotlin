@@ -87,6 +87,27 @@ When the agent creates a commit, follow this format unless the user specifies an
 gradlew.bat :app:assembleDebug
 ```
 
+## Versioning
+
+Single source of truth: `app/build.gradle.kts` → `defaultConfig`.
+
+| Field | Meaning |
+|-------|---------|
+| `versionName` | User-facing `MAJOR.MINOR.PATCH` (shown in 设置) |
+| `versionCode` | Integer; must increase on every shipped build |
+
+**When to bump** (do it in the same change set that ships the work):
+
+- **PATCH** (`1.1.0` → `1.1.1`): bugfix, copy/UI polish, no new capability
+- **MINOR** (`1.1.0` → `1.2.0`): new user-facing feature (reminders, screens, gestures…)
+- **MAJOR** (`1.x` → `2.0.0`): breaking storage/API or large UX reset
+
+Also bump `versionCode` by **+1** whenever `versionName` changes.
+
+Settings 「版本」 reads `BuildConfig.VERSION_NAME` — never hardcode the string in UI.
+
+**Current:** `1.1.0` / `versionCode` 2 — recurrence + local reminders + 通知管理.
+
 ## Not done / optional later
 
 ICS import/export, fuller course editing parity with UniApp.

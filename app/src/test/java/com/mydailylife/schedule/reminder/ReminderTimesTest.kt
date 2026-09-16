@@ -142,6 +142,37 @@ class ReminderTimesTest {
         )
     }
 
+    @Test
+    fun listUpcomingGroupsDailyByDateOrder() {
+        val clock = LocalTime.of(10, 0)
+        val stored = at(LocalDate.of(2000, 1, 1), clock)
+        val now = at(LocalDate.of(2026, 9, 16), LocalTime.of(8, 0))
+        val item = item(
+            timeMode = ScheduleTimeMode.Daily,
+            start = stored,
+            end = 0L,
+            remindAtEnd = false,
+        )
+        val list = ReminderTimes.listUpcoming(
+            items = listOf(item),
+            nowMillis = now,
+            zone = zone,
+            lookaheadDays = 2,
+        )
+        assertEquals(3, list.size)
+        assertTrue(list.zipWithNext().all { (a, b) -> a.triggerMillis <= b.triggerMillis })
+        assertEquals(
+            listOf(
+                LocalDate.of(2026, 9, 16),
+                LocalDate.of(2026, 9, 17),
+                LocalDate.of(2026, 9, 18),
+            ),
+            list.map {
+                java.time.Instant.ofEpochMilli(it.dueMillis).atZone(zone).toLocalDate()
+            },
+        )
+    }
+
     private fun at(date: LocalDate, time: LocalTime): Long =
         date.atTime(time).atZone(zone).toInstant().toEpochMilli()
 

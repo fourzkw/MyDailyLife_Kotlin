@@ -4,12 +4,30 @@ import com.mydailylife.schedule.data.ScheduleItem
 import com.mydailylife.schedule.data.ScheduleQuery
 import com.mydailylife.schedule.data.ScheduleTimeMode
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 data class ReminderSlot(
     val kind: ReminderKind,
     val dueMillis: Long,
 )
+
+/** One upcoming notification for the manage list (sorted by [triggerMillis]). */
+data class UpcomingReminder(
+    val scheduleId: String,
+    val title: String,
+    val kind: ReminderKind,
+    val timeMode: ScheduleTimeMode,
+    val dueMillis: Long,
+    val triggerMillis: Long,
+    val leadMinutes: Int,
+) {
+    val kindLabel: String
+        get() = when (kind) {
+            ReminderKind.Start -> "开始"
+            ReminderKind.End -> "截止"
+        }
+}
 
 /**
  * Next start/end due times for Once, Daily, and Weekly items.
@@ -18,6 +36,8 @@ data class ReminderSlot(
 object ReminderTimes {
     const val IMMEDIATE_DELAY_MS = 1_500L
     private const val MAX_LOOKAHEAD_DAYS = 400
+    /** Horizon for the notification-manage list. */
+    const val MANAGE_LOOKAHEAD_DAYS = 60
 
     fun slots(
         item: ScheduleItem,
@@ -31,6 +51,49 @@ object ReminderTimes {
             val due = nextDueMillis(item, kind, nowMillis, zone, alreadyFired) ?: return@mapNotNull null
             ReminderSlot(kind, due)
         }
+    }
+
+    /**
+     * All upcoming reminder fires within [lookaheadDays], sorted by trigger time then due.
+     * Recurring items may contribute multiple rows (one per occurrence in the window).
+     */
+    fun listUpcoming(
+        items: List<ScheduleItem>,
+        nowMillis: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+        lookaheadDays: Int = MANAGE_LOOKAHEAD_DAYS,
+        alreadyFired: (String, ReminderKind, Long) -> Boolean = { _, _, _ -> false },
+    ): List<UpcomingReminder> {
+        val horizon = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+            .plusDays(lookaheadDays.toLong())
+        return items
+            .asSequence()
+            .filter { !it.completed && it.reminderEnabled }
+            .filter { it.timeModeEnum != ScheduleTimeMode.Unlimited }
+            .flatMap { item ->
+                ReminderKind.entries.asSequence().flatMap { kind ->
+                    duesInWindow(item, kind, nowMillis, horizon, zone)
+                        .filterNot { due -> alreadyFired(item.id, kind, due) }
+                        .mapNotNull { due ->
+                            val trigger = computeTriggerMillis(
+                                dueMillis = due,
+                                leadMinutes = item.reminderBeforeMinutes,
+                                nowMillis = nowMillis,
+                            ) ?: return@mapNotNull null
+                            UpcomingReminder(
+                                scheduleId = item.id,
+                                title = item.title,
+                                kind = kind,
+                                timeMode = item.timeModeEnum,
+                                dueMillis = due,
+                                triggerMillis = trigger,
+                                leadMinutes = item.reminderBeforeMinutes,
+                            )
+                        }
+                }
+            }
+            .sortedWith(compareBy({ it.triggerMillis }, { it.dueMillis }, { it.title }))
+            .toList()
     }
 
     fun nextDueMillis(
@@ -95,6 +158,49 @@ object ReminderTimes {
             minutes < 60 -> "${minutes}分钟"
             minutes % 60L == 0L -> "${minutes / 60}小时"
             else -> "${minutes / 60}小时${minutes % 60}分钟"
+        }
+    }
+
+    private fun duesInWindow(
+        item: ScheduleItem,
+        kind: ReminderKind,
+        nowMillis: Long,
+        horizon: LocalDate,
+        zone: ZoneId,
+    ): Sequence<Long> {
+        val kindEnabled = when (kind) {
+            ReminderKind.Start -> item.remindAtStart
+            ReminderKind.End -> item.remindAtEnd
+        }
+        if (!kindEnabled) return emptySequence()
+        val stored = storedMillis(item, kind)
+        if (stored <= 0L) return emptySequence()
+
+        return when (item.timeModeEnum) {
+            ScheduleTimeMode.Unlimited -> emptySequence()
+            ScheduleTimeMode.Once -> {
+                if (stored <= nowMillis) emptySequence()
+                else {
+                    val dueDate = Instant.ofEpochMilli(stored).atZone(zone).toLocalDate()
+                    if (dueDate.isAfter(horizon)) emptySequence() else sequenceOf(stored)
+                }
+            }
+            ScheduleTimeMode.Daily, ScheduleTimeMode.Weekly -> {
+                val clock = Instant.ofEpochMilli(stored).atZone(zone)
+                    .toLocalTime()
+                    .withSecond(0)
+                    .withNano(0)
+                sequence {
+                    var date = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+                    while (!date.isAfter(horizon)) {
+                        if (ScheduleQuery.occursOn(item, date, zone)) {
+                            val due = date.atTime(clock).atZone(zone).toInstant().toEpochMilli()
+                            if (due > nowMillis) yield(due)
+                        }
+                        date = date.plusDays(1)
+                    }
+                }
+            }
         }
     }
 

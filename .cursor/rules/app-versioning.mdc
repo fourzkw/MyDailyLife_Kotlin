@@ -1,0 +1,18 @@
+---
+description: App version bump rules when shipping changes
+alwaysApply: true
+---
+
+# App versioning
+
+Source of truth: `app/build.gradle.kts` (`versionName`, `versionCode`).
+
+When shipping user-visible or behavior changes in this repo, **bump version in the same edit**:
+
+- **PATCH** — fixes / polish only
+- **MINOR** — new capability or screen
+- **MAJOR** — breaking data or large UX reset
+
+Always `versionCode += 1` when `versionName` changes. Do not hardcode the version in UI (use `BuildConfig.VERSION_NAME`).
+
+Details: `AGENTS.md` → Versioning.

@@ -15,6 +15,7 @@ object Routes {
     const val Create = "create"
     const val CreateWithId = "create/{scheduleId}"
     const val Completed = "completed"
+    const val Reminders = "reminders"
 
     val tabs = listOf(Schedule, Courses, Statistics, Settings)
 

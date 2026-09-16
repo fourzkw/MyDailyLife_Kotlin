@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mydailylife.schedule.BuildConfig
 import com.mydailylife.schedule.asMdlApp
 import com.mydailylife.schedule.data.AppSettings
 import com.mydailylife.schedule.data.Priority
@@ -330,7 +331,10 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
             SettingsGroup(title = "关于") {
-                SettingsRow(title = "版本", trailingText = "1.0")
+                SettingsRow(
+                    title = "版本",
+                    trailingText = BuildConfig.VERSION_NAME,
+                )
             }
             Spacer(modifier = Modifier.height(24.dp))
         }
