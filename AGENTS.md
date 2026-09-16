@@ -44,14 +44,14 @@ Legacy screens (`calendar`, `items`, `completed`) may still exist but are not pr
 
 ## Git commits
 
-Use [Conventional Commits](https://www.conventionalcommits.org/), English, imperative mood:
+Use [Conventional Commits](https://www.conventionalcommits.org/). Keep `type`/`scope` in English; write **summary and body in Chinese**.
 
 ```
-<type>(optional-scope): <summary>
+<type>(optional-scope): <中文摘要>
 ```
 
-- **Summary**: ≤72 chars; say *why* briefly; no trailing period
-- **Body** (optional): blank line after summary; wrap ~72; explain motivation when non-obvious
+- **Summary**: ≤72 chars; 简要说明为什么；句末不加句号
+- **Body** (optional): blank line after summary; wrap ~72; 非显而易见时补充动机（中文）
 - **One concern per commit**; do not mix unrelated changes
 
 | type | use for |
@@ -71,12 +71,12 @@ Use [Conventional Commits](https://www.conventionalcommits.org/), English, imper
 **Examples**
 
 ```
-feat(schedule): expand completed section at list bottom
-fix(schedule): ignore tap when long-press is cancelled
-style(theme): soften coral primary for light canvas
-docs: add AGENTS.md for AI project context
-chore: ignore .idea and build outputs
-build: bump Compose BOM
+feat(schedule): 列表底部展开已完成分组
+fix(schedule): 长按取消时不触发点击编辑
+style(theme): 浅色画布上弱化珊瑚主色
+docs: 补充 AGENTS.md 供 AI 对齐约定
+chore: 忽略 .idea 与构建产物
+build: 升级 Compose BOM
 ```
 
 When the agent creates a commit, follow this format unless the user specifies another message.
@@ -89,10 +89,12 @@ gradlew.bat :app:assembleDebug
 
 ## Not done / optional later
 
-ICS import/export, Daily/Weekly reminder recurrence, fuller course editing parity with UniApp.
+ICS import/export, fuller course editing parity with UniApp.
 
-**Reminders (phase 1–2):** `ReminderScheduler` + `AlarmManager` for Once items; notification channel;
-settings toggle requests `POST_NOTIFICATIONS` and can guide exact-alarm / app notification settings.
-BootReceiver restarts process so alarms are re-registered.
+**Reminders:** `ReminderScheduler` + `AlarmManager` for Once / Daily / Weekly;
+start and end can fire separately; per-item lead minutes on create.
+Notification channel; settings toggle requests `POST_NOTIFICATIONS` and can guide
+exact-alarm / app notification settings. BootReceiver restarts process so alarms
+are re-registered. After a recurring fire, the receiver re-schedules the next occurrence.
 
 Settings prefs persist via `SettingsRepository` → `settings.json`.

@@ -37,6 +37,8 @@ data class CreateUiState(
     val presetTags: List<String> = emptyList(),
     val reminderEnabled: Boolean = true,
     val reminderBeforeMinutes: Int = 15,
+    val remindAtStart: Boolean = true,
+    val remindAtEnd: Boolean = true,
     val loaded: Boolean = false,
     val saved: Boolean = false,
     val deleted: Boolean = false,
@@ -86,6 +88,8 @@ class CreateViewModel(
                         priority = settings.defaultPriorityEnum,
                         reminderEnabled = settings.notificationsEnabled,
                         reminderBeforeMinutes = settings.reminderBeforeMinutes,
+                        remindAtStart = true,
+                        remindAtEnd = true,
                         presetTags = settings.presetTags,
                     )
                 }
@@ -161,6 +165,10 @@ class CreateViewModel(
     }
 
     fun onReminderChange(value: Boolean) = _uiState.update { it.copy(reminderEnabled = value) }
+    fun onReminderBeforeMinutesChange(minutes: Int) =
+        _uiState.update { it.copy(reminderBeforeMinutes = minutes) }
+    fun onRemindAtStartChange(value: Boolean) = _uiState.update { it.copy(remindAtStart = value) }
+    fun onRemindAtEndChange(value: Boolean) = _uiState.update { it.copy(remindAtEnd = value) }
 
     fun save() {
         val state = _uiState.value
@@ -202,9 +210,11 @@ class CreateViewModel(
                 startTimeMillis = startMillis,
                 endTimeMillis = endMillis,
                 completed = existing?.completed ?: false,
-                reminderEnabled = state.reminderEnabled,
-                reminderBeforeMinutes = existing?.reminderBeforeMinutes
-                    ?: state.reminderBeforeMinutes,
+                reminderEnabled = state.timeMode != ScheduleTimeMode.Unlimited &&
+                    state.reminderEnabled,
+                reminderBeforeMinutes = state.reminderBeforeMinutes,
+                remindAtStart = state.remindAtStart,
+                remindAtEnd = state.remindAtEnd,
                 timeMode = state.timeMode.storageKey,
                 weekdays = if (state.timeMode == ScheduleTimeMode.Weekly) {
                     state.weekdays.sorted()
@@ -245,6 +255,8 @@ class CreateViewModel(
             tagsText = existing.tags.joinToString(", "),
             reminderEnabled = existing.reminderEnabled,
             reminderBeforeMinutes = existing.reminderBeforeMinutes,
+            remindAtStart = existing.remindAtStart,
+            remindAtEnd = existing.remindAtEnd,
             loaded = true,
         )
         return when (existing.timeModeEnum) {

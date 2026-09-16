@@ -5,14 +5,14 @@ alwaysApply: true
 
 # Git commit messages
 
-Follow Conventional Commits (English, imperative):
+Follow Conventional Commits. Keep `type`/`scope` in English; write **summary and body in Chinese** (imperative / 说明意图):
 
 ```
-<type>(optional-scope): <summary>
+<type>(optional-scope): <中文摘要>
 ```
 
 - Summary ≤72 chars, no trailing period; focus on why
-- Optional body after a blank line
+- Optional body after a blank line, also Chinese
 - One logical change per commit
 
 **Types:** `feat` | `fix` | `refactor` | `style` | `docs` | `chore` | `build` | `test` | `perf`

@@ -82,17 +82,21 @@ object ScheduleQuery {
     fun completed(items: List<ScheduleItem>): List<ScheduleItem> =
         sorted(items).filter { it.completed }
 
-    fun occursOn(item: ScheduleItem, date: LocalDate): Boolean {
+    fun occursOn(
+        item: ScheduleItem,
+        date: LocalDate,
+        zone: ZoneId = ScheduleQuery.zone,
+    ): Boolean {
         return when (item.timeModeEnum) {
             // One global item on every day; complete/delete toggles the whole item.
             ScheduleTimeMode.Unlimited -> true
-            ScheduleTimeMode.Once -> !item.excludes(date) && withinDateSpan(item, date)
-            ScheduleTimeMode.Daily -> !item.excludes(date) && withinRecurrenceWindow(item, date)
+            ScheduleTimeMode.Once -> !item.excludes(date) && withinDateSpan(item, date, zone)
+            ScheduleTimeMode.Daily -> !item.excludes(date) && withinRecurrenceWindow(item, date, zone)
             ScheduleTimeMode.Weekly -> {
                 if (item.excludes(date)) return false
                 val iso = date.dayOfWeek.value
                 if (item.weekdays.isNotEmpty() && iso !in item.weekdays) return false
-                withinRecurrenceWindow(item, date)
+                withinRecurrenceWindow(item, date, zone)
             }
         }
     }
@@ -216,19 +220,27 @@ object ScheduleQuery {
         }
     }
 
-    private fun withinRecurrenceWindow(item: ScheduleItem, date: LocalDate): Boolean {
-        val start = dateOf(item.startTimeMillis)
+    private fun withinRecurrenceWindow(
+        item: ScheduleItem,
+        date: LocalDate,
+        zone: ZoneId,
+    ): Boolean {
+        val start = dateOf(item.startTimeMillis, zone)
         if (start != null && date.isBefore(start)) return false
-        val end = dateOf(item.endTimeMillis)
+        val end = dateOf(item.endTimeMillis, zone)
         // Same-day end is time-of-day only; later end date closes the series.
         if (start != null && end != null && end.isAfter(start) && date.isAfter(end)) return false
         return true
     }
 
     /** Once: inclusive calendar span from start and/or end; unset times → not on any day. */
-    private fun withinDateSpan(item: ScheduleItem, date: LocalDate): Boolean {
-        val start = dateOf(item.startTimeMillis)
-        val end = dateOf(item.endTimeMillis)
+    private fun withinDateSpan(
+        item: ScheduleItem,
+        date: LocalDate,
+        zone: ZoneId,
+    ): Boolean {
+        val start = dateOf(item.startTimeMillis, zone)
+        val end = dateOf(item.endTimeMillis, zone)
         return when {
             start != null && end != null -> !date.isBefore(start) && !date.isAfter(end)
             start != null -> date == start
@@ -237,7 +249,7 @@ object ScheduleQuery {
         }
     }
 
-    private fun dateOf(millis: Long): LocalDate? {
+    private fun dateOf(millis: Long, zone: ZoneId = ScheduleQuery.zone): LocalDate? {
         if (millis <= 0L) return null
         return Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
     }

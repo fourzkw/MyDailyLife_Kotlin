@@ -38,6 +38,7 @@ object NotificationHelper {
     fun showReminder(
         context: Context,
         scheduleId: String,
+        kind: ReminderKind = ReminderKind.End,
         title: String,
         body: String,
     ) {
@@ -50,7 +51,7 @@ object NotificationHelper {
         }
         val contentPi = PendingIntent.getActivity(
             context,
-            requestCode(scheduleId),
+            requestCode(scheduleId, kind),
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -67,9 +68,12 @@ object NotificationHelper {
             .build()
 
         runCatching {
-            NotificationManagerCompat.from(context).notify(requestCode(scheduleId), notification)
+            NotificationManagerCompat.from(context).notify(requestCode(scheduleId, kind), notification)
         }
     }
 
-    fun requestCode(scheduleId: String): Int = scheduleId.hashCode() and 0x7fffffff
+    fun requestCode(
+        scheduleId: String,
+        kind: ReminderKind = ReminderKind.End,
+    ): Int = (scheduleId + kind.storageKey).hashCode() and 0x7fffffff
 }

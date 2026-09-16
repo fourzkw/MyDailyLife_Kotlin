@@ -66,6 +66,10 @@ data class ScheduleItem(
     val completed: Boolean = false,
     val reminderEnabled: Boolean = false,
     val reminderBeforeMinutes: Int = 15,
+    /** When [reminderEnabled], fire before [startTimeMillis] if that time is set. */
+    val remindAtStart: Boolean = true,
+    /** When [reminderEnabled], fire before [endTimeMillis] if that time is set. */
+    val remindAtEnd: Boolean = true,
     val timeMode: String = ScheduleTimeMode.Once.storageKey,
     /** ISO day-of-week values 1–7; used when [timeMode] is weekly. */
     val weekdays: List<Int> = emptyList(),

@@ -270,7 +270,7 @@ fun SettingsScreen(
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             !app.reminderScheduler.canScheduleExactAlarms() ->
             "已启用；精确闹钟未授权，提醒可能延迟"
-        else -> "已启用「仅一次」事项的本地提醒"
+        else -> "已启用仅一次、每天、每周事项的本地提醒"
     }
 
     Column(modifier = Modifier.fillMaxSize()) {

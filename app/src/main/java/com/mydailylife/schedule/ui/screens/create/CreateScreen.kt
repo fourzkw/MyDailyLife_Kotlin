@@ -1,5 +1,6 @@
 ﻿package com.mydailylife.schedule.ui.screens.create
 
+import android.widget.NumberPicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,22 +23,24 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,8 +49,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mydailylife.schedule.data.AppSettings
 import com.mydailylife.schedule.data.Priority
 import com.mydailylife.schedule.data.ScheduleItem
 import com.mydailylife.schedule.data.ScheduleTimeMode
@@ -56,12 +61,15 @@ import com.mydailylife.schedule.ui.components.DeleteScheduleDialog
 import com.mydailylife.schedule.ui.components.FormFieldShell
 import com.mydailylife.schedule.ui.components.PrimaryPillButton
 import com.mydailylife.schedule.ui.components.SettingsRow
+import com.mydailylife.schedule.ui.theme.CardShape
+import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.MutedSoft
 import com.mydailylife.schedule.ui.theme.OnSoftPrimary
 import com.mydailylife.schedule.ui.theme.PillShape
 import com.mydailylife.schedule.ui.theme.PriorityUrgent
+import com.mydailylife.schedule.ui.theme.Rausch
 import com.mydailylife.schedule.ui.theme.RauschSoft
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import com.mydailylife.schedule.ui.theme.SurfaceStrong
@@ -101,6 +109,7 @@ fun CreateScreen(
     var pickerTarget by remember { mutableStateOf<PickerTarget?>(null) }
     var dateTimeSession by remember { mutableStateOf<DateTimePickSession?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showLeadDialog by remember { mutableStateOf(false) }
     val zone = remember { ZoneId.systemDefault() }
     val dateFormatter = remember {
         DateTimeFormatter.ofPattern("yyyy年M月d日 E", Locale.CHINA)
@@ -292,12 +301,64 @@ fun CreateScreen(
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            SettingsRow(
-                title = "提醒",
-                subtitle = "结束前本地通知（仅一次事项）",
-                checked = uiState.reminderEnabled,
-                onCheckedChange = viewModel::onReminderChange,
-            )
+            val canRemind = uiState.timeMode != ScheduleTimeMode.Unlimited
+            val hasStart = if (uiState.showDateTimePickers) {
+                uiState.startDate != null && uiState.startTime != null
+            } else {
+                uiState.startTime != null
+            }
+            val hasEnd = if (uiState.showDateTimePickers) {
+                uiState.endDate != null && uiState.endTime != null
+            } else {
+                uiState.endTime != null
+            }
+            val reminderSubtitle = when {
+                !canRemind -> "无限制事项没有时刻，无法提醒"
+                !uiState.reminderEnabled -> "关闭后本条不弹出本地提醒"
+                !hasStart && !hasEnd -> "请先设置开始或结束时间"
+                else -> "开始/结束前按提前量本地通知"
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(CardShape)
+                    .background(SurfaceSoft),
+            ) {
+                SettingsRow(
+                    title = "提醒",
+                    subtitle = reminderSubtitle,
+                    checked = uiState.reminderEnabled && canRemind,
+                    onCheckedChange = { enabled ->
+                        if (canRemind) viewModel.onReminderChange(enabled)
+                    },
+                )
+                if (canRemind && uiState.reminderEnabled) {
+                    HorizontalDivider(color = Hairline)
+                    SettingsRow(
+                        title = "提前提醒",
+                        trailingText = AppSettings.reminderLabel(uiState.reminderBeforeMinutes),
+                        onClick = { showLeadDialog = true },
+                    )
+                    HorizontalDivider(color = Hairline)
+                    SettingsRow(
+                        title = "开始时提醒",
+                        subtitle = if (hasStart) "到达开始时间前提醒" else "请先设置开始时间",
+                        checked = uiState.remindAtStart && hasStart,
+                        onCheckedChange = { enabled ->
+                            if (hasStart) viewModel.onRemindAtStartChange(enabled)
+                        },
+                    )
+                    HorizontalDivider(color = Hairline)
+                    SettingsRow(
+                        title = "结束时提醒",
+                        subtitle = if (hasEnd) "到达结束时间前提醒" else "请先设置结束时间",
+                        checked = uiState.remindAtEnd && hasEnd,
+                        onCheckedChange = { enabled ->
+                            if (hasEnd) viewModel.onRemindAtEndChange(enabled)
+                        },
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(24.dp))
             PrimaryPillButton(
                 text = "保存",
@@ -319,6 +380,46 @@ fun CreateScreen(
                 )
             }
         }
+    }
+
+    if (showLeadDialog) {
+        AlertDialog(
+            onDismissRequest = { showLeadDialog = false },
+            title = { Text("提前提醒") },
+            text = {
+                Column {
+                    AppSettings.ReminderMinuteOptions.forEach { minutes ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.onReminderBeforeMinutesChange(minutes)
+                                    showLeadDialog = false
+                                }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = minutes == uiState.reminderBeforeMinutes,
+                                onClick = {
+                                    viewModel.onReminderBeforeMinutesChange(minutes)
+                                    showLeadDialog = false
+                                },
+                                colors = RadioButtonDefaults.colors(selectedColor = Rausch),
+                            )
+                            Text(
+                                AppSettings.reminderLabel(minutes),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Ink,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLeadDialog = false }) { Text("取消") }
+            },
+        )
     }
 
     when (val target = pickerTarget) {
@@ -476,30 +577,81 @@ private fun DatePickerSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimePickerSheet(
     initialTime: LocalTime,
     onDismiss: () -> Unit,
     onConfirm: (LocalTime) -> Unit,
 ) {
-    val state = rememberTimePickerState(
-        initialHour = initialTime.hour,
-        initialMinute = initialTime.minute,
-        is24Hour = true,
-    )
+    var hour by remember { mutableIntStateOf(initialTime.hour) }
+    var minute by remember { mutableIntStateOf(initialTime.minute) }
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(LocalTime.of(state.hour, state.minute)) },
+                onClick = { onConfirm(LocalTime.of(hour, minute)) },
             ) { Text("确定") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }
         },
         text = {
-            TimePicker(state = state)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TimeWheelPicker(
+                    value = hour,
+                    range = 0..23,
+                    onValueChange = { hour = it },
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = ":",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Ink,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                TimeWheelPicker(
+                    value = minute,
+                    range = 0..59,
+                    onValueChange = { minute = it },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        },
+    )
+}
+
+/** Single looping wheel (0–23 / 0–59), not Material's dual-ring dial. */
+@Composable
+private fun TimeWheelPicker(
+    value: Int,
+    range: IntRange,
+    onValueChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val labels = remember(range) {
+        range.map { String.format("%02d", it) }.toTypedArray()
+    }
+    AndroidView(
+        modifier = modifier.height(160.dp),
+        factory = { context ->
+            NumberPicker(context).apply {
+                // Set bounds before displayedValues.
+                minValue = range.first
+                maxValue = range.last
+                displayedValues = labels
+                this.value = value.coerceIn(range)
+                wrapSelectorWheel = true
+                descendantFocusability = NumberPicker.FOCUS_BLOCK_DESCENDANTS
+                setOnValueChangedListener { _, _, newVal -> onValueChange(newVal) }
+            }
+        },
+        update = { picker ->
+            if (picker.value != value) picker.value = value.coerceIn(range)
+            picker.setOnValueChangedListener { _, _, newVal -> onValueChange(newVal) }
         },
     )
 }
