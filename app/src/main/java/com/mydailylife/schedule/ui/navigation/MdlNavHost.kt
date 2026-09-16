@@ -24,7 +24,9 @@ import androidx.navigation.navArgument
 import com.mydailylife.schedule.asMdlApp
 import com.mydailylife.schedule.ui.screens.completed.CompletedScreen
 import com.mydailylife.schedule.ui.screens.completed.CompletedViewModel
+import com.mydailylife.schedule.ui.screens.courses.AcademicImportScreen
 import com.mydailylife.schedule.ui.screens.courses.CoursesScreen
+import com.mydailylife.schedule.ui.screens.courses.CoursesViewModel
 import com.mydailylife.schedule.ui.screens.create.CreateScreen
 import com.mydailylife.schedule.ui.screens.create.CreateViewModel
 import com.mydailylife.schedule.ui.screens.reminders.ReminderManageScreen
@@ -115,7 +117,24 @@ fun MdlNavHost(
                     viewModel = vm,
                 )
             }
-            composable(Routes.Courses) { CoursesScreen() }
+            composable(Routes.Courses) {
+                val vm: CoursesViewModel = viewModel(
+                    factory = CoursesViewModel.factory(app.courseRepository),
+                )
+                CoursesScreen(
+                    onAcademicImport = { navController.navigate(Routes.AcademicImport) },
+                    viewModel = vm,
+                )
+            }
+            composable(Routes.AcademicImport) {
+                AcademicImportScreen(
+                    courseRepository = app.courseRepository,
+                    onBack = { navController.popBackStack() },
+                    onImported = {
+                        navController.popBackStack()
+                    },
+                )
+            }
             composable(Routes.Statistics) {
                 val vm: StatisticsViewModel = viewModel(
                     factory = StatisticsViewModel.factory(repository),

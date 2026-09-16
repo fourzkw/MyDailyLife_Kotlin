@@ -106,11 +106,16 @@ Also bump `versionCode` by **+1** whenever `versionName` changes.
 
 Settings 「版本」 reads `BuildConfig.VERSION_NAME` — never hardcode the string in UI.
 
-**Current:** `1.1.0` / `versionCode` 2 — recurrence + local reminders + 通知管理.
+**Current:** `1.5.0` / `versionCode` 7 — term-start picker + course settings.
 
 ## Not done / optional later
 
-ICS import/export, fuller course editing parity with UniApp.
+ICS course import/export, Excel `.xlsx` binary parse,
+fuller course editing.
+
+**Courses:** grid + `CourseStore` (`courses.json`); teaching week swipe filters
+`teachingWeeks`; tap block for detail; import Excel/CSV / 教务 WebView / ICS placeholder;
+term start editable (default autumn = Sept week-2 Monday, spring = Feb week-2 Monday).
 
 **Reminders:** `ReminderScheduler` + `AlarmManager` for Once / Daily / Weekly;
 start and end can fire separately; per-item lead minutes on create.

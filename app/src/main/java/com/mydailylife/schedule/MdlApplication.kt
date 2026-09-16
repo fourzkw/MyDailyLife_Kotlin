@@ -2,6 +2,7 @@ package com.mydailylife.schedule
 
 import android.app.Application
 import android.content.Context
+import com.mydailylife.schedule.data.CourseRepository
 import com.mydailylife.schedule.data.ScheduleRepository
 import com.mydailylife.schedule.data.SettingsRepository
 import com.mydailylife.schedule.reminder.NotificationHelper
@@ -17,6 +18,8 @@ class MdlApplication : Application() {
         private set
     lateinit var settingsRepository: SettingsRepository
         private set
+    lateinit var courseRepository: CourseRepository
+        private set
     lateinit var reminderScheduler: ReminderScheduler
         private set
 
@@ -26,6 +29,7 @@ class MdlApplication : Application() {
         super.onCreate()
         scheduleRepository = ScheduleRepository(this)
         settingsRepository = SettingsRepository(this)
+        courseRepository = CourseRepository(this)
         reminderScheduler = ReminderScheduler(this)
         NotificationHelper.ensureChannel(this)
         startReminderSync()

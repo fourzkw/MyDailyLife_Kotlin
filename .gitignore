@@ -14,3 +14,8 @@ local.properties
 *.aab
 *.dex
 *.class
+
+# Local academic captures (may contain personal timetable data)
+/课表
+课表.json
+**/my-table-detail*.json

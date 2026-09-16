@@ -16,6 +16,7 @@ object Routes {
     const val CreateWithId = "create/{scheduleId}"
     const val Completed = "completed"
     const val Reminders = "reminders"
+    const val AcademicImport = "courses/academic-import"
 
     val tabs = listOf(Schedule, Courses, Statistics, Settings)
 
