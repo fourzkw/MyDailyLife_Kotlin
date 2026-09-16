@@ -1,5 +1,6 @@
 package com.mydailylife.schedule.data
 
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -17,16 +18,15 @@ object ScheduleQuery {
         }
         var score = urgency * 0.4
 
-        score += if (item.typeEnum == ScheduleType.Task) {
-            val taskTime = when (item.priorityEnum) {
-                Priority.Urgent -> 2.0
-                Priority.High -> 1.5
-                Priority.Medium -> 1.0
-                Priority.Low -> 0.5
-            }
-            taskTime * 0.4
+        val dueMillis = when {
+            item.endTimeMillis > 0L -> item.endTimeMillis
+            item.startTimeMillis > 0L -> item.startTimeMillis
+            else -> 0L
+        }
+        score += if (dueMillis <= 0L || item.timeModeEnum == ScheduleTimeMode.Unlimited) {
+            urgency * 0.1
         } else {
-            val diffDays = ScheduleTimeFormat.daysUntil(item.endTimeMillis, nowMillis)
+            val diffDays = ScheduleTimeFormat.daysUntil(dueMillis, nowMillis)
             val timeScore = when {
                 diffDays < 0 -> 4.0
                 diffDays == 0L -> 3.0
@@ -46,20 +46,18 @@ object ScheduleQuery {
             .map { it to calculatePriorityScore(it) }
             .sortedWith(
                 compareByDescending<Pair<ScheduleItem, Double>> { it.second }
-                    .thenComparator { a, b ->
-                        val left = a.first
-                        val right = b.first
-                        when {
-                            left.typeEnum == ScheduleType.Task && right.typeEnum == ScheduleType.Task ->
-                                left.updatedAtMillis.compareTo(right.updatedAtMillis)
-                            left.typeEnum != ScheduleType.Task && right.typeEnum != ScheduleType.Task ->
-                                left.endTimeMillis.compareTo(right.endTimeMillis)
-                            left.typeEnum != ScheduleType.Task -> -1
-                            else -> 1
-                        }
-                    },
+                    .thenBy { itemSortKey(it.first) }
+                    .thenByDescending { it.first.updatedAtMillis },
             )
             .map { it.first }
+    }
+
+    private fun itemSortKey(item: ScheduleItem): Long {
+        return when {
+            item.startTimeMillis > 0L -> item.startTimeMillis
+            item.endTimeMillis > 0L -> item.endTimeMillis
+            else -> Long.MAX_VALUE
+        }
     }
 
     fun pendingVisible(
@@ -84,43 +82,51 @@ object ScheduleQuery {
     fun completed(items: List<ScheduleItem>): List<ScheduleItem> =
         sorted(items).filter { it.completed }
 
-    /** Align with original: day assignment uses endTime when present. */
-    fun anchorDate(item: ScheduleItem): LocalDate? {
-        val millis = when {
-            item.endTimeMillis > 0L -> item.endTimeMillis
-            item.startTimeMillis > 0L -> item.startTimeMillis
-            else -> return null
+    fun occursOn(item: ScheduleItem, date: LocalDate): Boolean {
+        return when (item.timeModeEnum) {
+            // One global item on every day; complete/delete toggles the whole item.
+            ScheduleTimeMode.Unlimited -> true
+            ScheduleTimeMode.Once -> !item.excludes(date) && withinDateSpan(item, date)
+            ScheduleTimeMode.Daily -> !item.excludes(date) && withinRecurrenceWindow(item, date)
+            ScheduleTimeMode.Weekly -> {
+                if (item.excludes(date)) return false
+                val iso = date.dayOfWeek.value
+                if (item.weekdays.isNotEmpty() && iso !in item.weekdays) return false
+                withinRecurrenceWindow(item, date)
+            }
         }
-        return Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
     }
 
     fun itemsForDate(items: List<ScheduleItem>, date: LocalDate): List<ScheduleItem> =
-        sorted(items.filter { anchorDate(it) == date })
+        sorted(items.filter { occursOn(it, date) })
 
     fun dayPrioritiesInMonth(
         items: List<ScheduleItem>,
         month: YearMonth,
     ): Map<LocalDate, List<Priority>> {
-        return items
-            .mapNotNull { item ->
-                val date = anchorDate(item) ?: return@mapNotNull null
-                if (YearMonth.from(date) != month) return@mapNotNull null
-                date to item.priorityEnum
+        val result = linkedMapOf<LocalDate, MutableList<Priority>>()
+        val days = month.lengthOfMonth()
+        for (day in 1..days) {
+            val date = month.atDay(day)
+            items.forEach { item ->
+                if (!item.completed && occursOn(item, date)) {
+                    result.getOrPut(date) { mutableListOf() }.add(item.priorityEnum)
+                }
             }
-            .groupBy({ it.first }, { it.second })
-            .mapValues { (_, priorities) ->
-                priorities
-                    .sortedBy {
-                        when (it) {
-                            Priority.Urgent -> 0
-                            Priority.High -> 1
-                            Priority.Medium -> 2
-                            Priority.Low -> 3
-                        }
+        }
+        return result.mapValues { (_, priorities) ->
+            priorities
+                .sortedBy {
+                    when (it) {
+                        Priority.Urgent -> 0
+                        Priority.High -> 1
+                        Priority.Medium -> 2
+                        Priority.Low -> 3
                     }
-                    .distinct()
-                    .take(3)
-            }
+                }
+                .distinct()
+                .take(3)
+        }
     }
 
     fun statistics(items: List<ScheduleItem>, nowMillis: Long = System.currentTimeMillis()): ScheduleStatistics {
@@ -128,9 +134,7 @@ object ScheduleQuery {
         val completedCount = items.count { it.completed }
         val urgent = items.count { it.priorityEnum == Priority.Urgent && !it.completed }
         val overdue = items.count { item ->
-            !item.completed &&
-                item.endTimeMillis > 0L &&
-                item.endTimeMillis < nowMillis
+            !item.completed && isOverdue(item, nowMillis)
         }
         val completionRate = if (total > 0) completedCount.toFloat() / total else 0f
 
@@ -160,17 +164,17 @@ object ScheduleQuery {
         val today = LocalDate.now(zone)
         val weekTrend = (6 downTo 0).map { offset ->
             val date = today.minusDays(offset.toLong())
-            val count = items.count { anchorDate(it) == date }
+            val count = items.count { occursOn(it, date) }
             DayTrend(
                 date = date,
-                label = when (date.dayOfWeek.value) {
-                    1 -> "一"
-                    2 -> "二"
-                    3 -> "三"
-                    4 -> "四"
-                    5 -> "五"
-                    6 -> "六"
-                    else -> "日"
+                label = when (date.dayOfWeek) {
+                    DayOfWeek.MONDAY -> "一"
+                    DayOfWeek.TUESDAY -> "二"
+                    DayOfWeek.WEDNESDAY -> "三"
+                    DayOfWeek.THURSDAY -> "四"
+                    DayOfWeek.FRIDAY -> "五"
+                    DayOfWeek.SATURDAY -> "六"
+                    DayOfWeek.SUNDAY -> "日"
                 },
                 count = count,
             )
@@ -188,33 +192,54 @@ object ScheduleQuery {
         )
     }
 
+    private fun isOverdue(item: ScheduleItem, nowMillis: Long): Boolean {
+        return when (item.timeModeEnum) {
+            ScheduleTimeMode.Unlimited, ScheduleTimeMode.Daily, ScheduleTimeMode.Weekly -> false
+            ScheduleTimeMode.Once -> {
+                val due = when {
+                    item.endTimeMillis > 0L -> item.endTimeMillis
+                    item.startTimeMillis > 0L -> item.startTimeMillis
+                    else -> return false
+                }
+                due < nowMillis
+            }
+        }
+    }
+
     private fun matchesChip(item: ScheduleItem, chip: String, today: LocalDate): Boolean {
         return when (chip) {
             "全部" -> true
-            "日程" -> item.typeEnum == ScheduleType.Schedule
-            "任务" -> item.typeEnum == ScheduleType.Task
-            "今天", "明天", "本周" -> {
-                if (item.typeEnum == ScheduleType.Task) true
-                else {
-                    val endDate = if (item.endTimeMillis <= 0L) {
-                        null
-                    } else {
-                        Instant.ofEpochMilli(item.endTimeMillis)
-                            .atZone(zone)
-                            .toLocalDate()
-                    }
-                    when (chip) {
-                        "今天" -> endDate == today
-                        "明天" -> endDate == today.plusDays(1)
-                        "本周" -> endDate != null &&
-                            !endDate.isBefore(today) &&
-                            !endDate.isAfter(today.plusDays(7))
-                        else -> true
-                    }
-                }
-            }
+            "今天" -> occursOn(item, today)
+            "明天" -> occursOn(item, today.plusDays(1))
+            "本周" -> (0L..7L).any { occursOn(item, today.plusDays(it)) }
             else -> true
         }
+    }
+
+    private fun withinRecurrenceWindow(item: ScheduleItem, date: LocalDate): Boolean {
+        val start = dateOf(item.startTimeMillis)
+        if (start != null && date.isBefore(start)) return false
+        val end = dateOf(item.endTimeMillis)
+        // Same-day end is time-of-day only; later end date closes the series.
+        if (start != null && end != null && end.isAfter(start) && date.isAfter(end)) return false
+        return true
+    }
+
+    /** Once: inclusive calendar span from start and/or end; unset times → not on any day. */
+    private fun withinDateSpan(item: ScheduleItem, date: LocalDate): Boolean {
+        val start = dateOf(item.startTimeMillis)
+        val end = dateOf(item.endTimeMillis)
+        return when {
+            start != null && end != null -> !date.isBefore(start) && !date.isAfter(end)
+            start != null -> date == start
+            end != null -> date == end
+            else -> false
+        }
+    }
+
+    private fun dateOf(millis: Long): LocalDate? {
+        if (millis <= 0L) return null
+        return Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
     }
 }
 

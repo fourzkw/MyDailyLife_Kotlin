@@ -8,6 +8,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -29,6 +30,7 @@ import com.mydailylife.schedule.ui.screens.create.CreateViewModel
 import com.mydailylife.schedule.ui.screens.schedule.ScheduleScreen
 import com.mydailylife.schedule.ui.screens.schedule.ScheduleViewModel
 import com.mydailylife.schedule.ui.screens.settings.SettingsScreen
+import com.mydailylife.schedule.ui.screens.settings.SettingsViewModel
 import com.mydailylife.schedule.ui.screens.statistics.StatisticsScreen
 import com.mydailylife.schedule.ui.screens.statistics.StatisticsViewModel
 import com.mydailylife.schedule.ui.theme.Muted
@@ -37,7 +39,10 @@ import com.mydailylife.schedule.ui.theme.RauschSoft
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 
 @Composable
-fun MdlNavHost() {
+fun MdlNavHost(
+    openScheduleId: String? = null,
+    onOpenScheduleConsumed: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -45,6 +50,13 @@ fun MdlNavHost() {
     val app = LocalContext.current.applicationContext.asMdlApp()
     val repository = app.scheduleRepository
 
+    LaunchedEffect(openScheduleId) {
+        val id = openScheduleId ?: return@LaunchedEffect
+        navController.navigate(Routes.create(id)) {
+            launchSingleTop = true
+        }
+        onOpenScheduleConsumed()
+    }
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
@@ -107,10 +119,19 @@ fun MdlNavHost() {
                 )
                 StatisticsScreen(viewModel = vm)
             }
-            composable(Routes.Settings) { SettingsScreen() }
+            composable(Routes.Settings) {
+                val vm: SettingsViewModel = viewModel(
+                    factory = SettingsViewModel.factory(app.settingsRepository),
+                )
+                SettingsScreen(viewModel = vm)
+            }
             composable(Routes.Create) {
                 val vm: CreateViewModel = viewModel(
-                    factory = CreateViewModel.factory(repository, editId = null),
+                    factory = CreateViewModel.factory(
+                        repository = repository,
+                        settingsRepository = app.settingsRepository,
+                        editId = null,
+                    ),
                 )
                 CreateScreen(
                     onBack = { navController.popBackStack() },
@@ -125,7 +146,11 @@ fun MdlNavHost() {
             ) { entry ->
                 val id = entry.arguments?.getString("scheduleId")
                 val vm: CreateViewModel = viewModel(
-                    factory = CreateViewModel.factory(repository, editId = id),
+                    factory = CreateViewModel.factory(
+                        repository = repository,
+                        settingsRepository = app.settingsRepository,
+                        editId = id,
+                    ),
                 )
                 CreateScreen(
                     onBack = { navController.popBackStack() },

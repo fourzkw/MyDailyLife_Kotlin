@@ -62,6 +62,20 @@ class ItemsViewModel(
         }
     }
 
+    fun delete(id: String) {
+        viewModelScope.launch {
+            repository.delete(id)
+            message.value = "已删除"
+        }
+    }
+
+    fun deleteOccurrence(id: String, date: java.time.LocalDate) {
+        viewModelScope.launch {
+            repository.excludeOccurrence(id, date)
+            message.value = "已删除当天"
+        }
+    }
+
     fun consumeMessage() {
         message.value = null
     }

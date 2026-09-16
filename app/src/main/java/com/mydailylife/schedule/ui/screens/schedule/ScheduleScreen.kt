@@ -1,10 +1,17 @@
 package com.mydailylife.schedule.ui.screens.schedule
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,10 +45,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,14 +59,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mydailylife.schedule.data.Priority
+import com.mydailylife.schedule.data.ScheduleItem
+import com.mydailylife.schedule.data.ScheduleTimeMode
+import com.mydailylife.schedule.ui.components.DeleteScheduleDialog
 import com.mydailylife.schedule.ui.components.MdlFab
 import com.mydailylife.schedule.ui.components.MdlSearchPill
 import com.mydailylife.schedule.ui.components.PrimaryPillButton
 import com.mydailylife.schedule.ui.components.ScheduleCard
 import com.mydailylife.schedule.ui.components.SectionHeader
+import com.mydailylife.schedule.ui.components.bidirectionalSwipe
 import com.mydailylife.schedule.ui.components.horizontalSwipe
 import com.mydailylife.schedule.ui.components.priorityColor
-import com.mydailylife.schedule.ui.components.verticalSwipe
 import com.mydailylife.schedule.ui.theme.Canvas
 import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Ink
@@ -71,6 +84,22 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
 
+private const val DaySlideMs = 280
+
+private data class DayPage(
+    val date: LocalDate,
+    val pendingItems: List<ScheduleItem>,
+    val completedItems: List<ScheduleItem>,
+    val completedExpanded: Boolean,
+    val query: String,
+)
+
+private data class WeekStripPage(
+    val weekDates: List<LocalDate>,
+    val selectedDate: LocalDate,
+    val dayDots: Map<LocalDate, List<Priority>>,
+)
+
 @Composable
 fun ScheduleScreen(
     onCreate: () -> Unit,
@@ -80,12 +109,41 @@ fun ScheduleScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val today = LocalDate.now()
-    val hasAnyItems = uiState.pendingItems.isNotEmpty() || uiState.completedItems.isNotEmpty()
+    val dayPage = DayPage(
+        date = uiState.selectedDate,
+        pendingItems = uiState.pendingItems,
+        completedItems = uiState.completedItems,
+        completedExpanded = uiState.completedExpanded,
+        query = uiState.query,
+    )
+    var pendingDelete by remember { mutableStateOf<ScheduleItem?>(null) }
 
     LaunchedEffect(uiState.message) {
         val msg = uiState.message ?: return@LaunchedEffect
         snackbar.showSnackbar(msg)
         viewModel.consumeMessage()
+    }
+
+    pendingDelete?.let { item ->
+        val canSkipDay = item.timeModeEnum == ScheduleTimeMode.Daily ||
+            item.timeModeEnum == ScheduleTimeMode.Weekly
+        DeleteScheduleDialog(
+            item = item,
+            occurrenceDate = uiState.selectedDate.takeIf { canSkipDay },
+            onDeleteThisDay = if (canSkipDay) {
+                {
+                    viewModel.deleteOccurrence(item.id, uiState.selectedDate)
+                    pendingDelete = null
+                }
+            } else {
+                null
+            },
+            onDeleteEntire = {
+                viewModel.delete(item.id)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null },
+        )
     }
 
     Scaffold(
@@ -97,11 +155,7 @@ fun ScheduleScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp)
-                .horizontalSwipe(
-                    onSwipeLeft = { viewModel.shiftDay(1) },
-                    onSwipeRight = { viewModel.shiftDay(-1) },
-                ),
+                .padding(horizontal = 16.dp),
         ) {
             Spacer(modifier = Modifier.height(8.dp))
             SectionHeader(title = "日程")
@@ -116,65 +170,82 @@ fun ScheduleScreen(
                 onExpand = viewModel::expandMonth,
                 onCollapse = viewModel::collapseMonth,
                 onSelectDate = viewModel::selectDate,
+                onShiftDay = viewModel::shiftDay,
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(
-                text = formatSelectedTitle(uiState.selectedDate, today),
-                style = MaterialTheme.typography.titleLarge,
-                color = Ink,
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            MdlSearchPill(
-                query = uiState.query,
-                onQueryChange = viewModel::onQueryChange,
-                placeholder = "搜索当日事项",
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (!hasAnyItems) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                ) {
+            AnimatedContent(
+                targetState = dayPage,
+                contentKey = { it.date },
+                transitionSpec = { daySlideTransition() },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clipToBounds()
+                    .horizontalSwipe(
+                        onSwipeLeft = { viewModel.shiftDay(1) },
+                        onSwipeRight = { viewModel.shiftDay(-1) },
+                    ),
+                label = "day-page",
+            ) { page ->
+                val hasAnyItems = page.pendingItems.isNotEmpty() || page.completedItems.isNotEmpty()
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "这一天暂无日程",
-                        color = Muted,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 8.dp),
+                        text = formatSelectedTitle(page.date, today),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Ink,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    MdlSearchPill(
+                        query = page.query,
+                        onQueryChange = viewModel::onQueryChange,
+                        placeholder = "搜索当日事项",
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    PrimaryPillButton(text = "添加日程", onClick = onCreate)
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 88.dp),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    items(uiState.pendingItems, key = { it.id }) { item ->
-                        ScheduleCard(
-                            item = item,
-                            onClick = { onEdit(item.id) },
-                            onLongClick = { viewModel.toggleCompleted(item.id) },
-                        )
-                    }
-                    if (uiState.completedItems.isNotEmpty()) {
-                        item(key = "completed-header") {
-                            CompletedSectionHeader(
-                                count = uiState.completedItems.size,
-                                expanded = uiState.completedExpanded,
-                                onClick = viewModel::toggleCompletedExpanded,
+
+                    if (!hasAnyItems) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "这一天暂无日程",
+                                color = Muted,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(top = 8.dp),
                             )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            PrimaryPillButton(text = "添加日程", onClick = onCreate)
                         }
-                        if (uiState.completedExpanded) {
-                            items(uiState.completedItems, key = { "done-${it.id}" }) { item ->
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(bottom = 88.dp),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            items(page.pendingItems, key = { it.id }) { item ->
                                 ScheduleCard(
                                     item = item,
                                     onClick = { onEdit(item.id) },
                                     onLongClick = { viewModel.toggleCompleted(item.id) },
+                                    onDeleteClick = { pendingDelete = item },
                                 )
+                            }
+                            if (page.completedItems.isNotEmpty()) {
+                                item(key = "completed-header") {
+                                    CompletedSectionHeader(
+                                        count = page.completedItems.size,
+                                        expanded = page.completedExpanded,
+                                        onClick = viewModel::toggleCompletedExpanded,
+                                    )
+                                }
+                                if (page.completedExpanded) {
+                                    items(page.completedItems, key = { "done-${it.id}" }) { item ->
+                                        ScheduleCard(
+                                            item = item,
+                                            onClick = { onEdit(item.id) },
+                                            onLongClick = { viewModel.toggleCompleted(item.id) },
+                                            onDeleteClick = { pendingDelete = item },
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -223,20 +294,20 @@ private fun CalendarStrip(
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
+    onShiftDay: (Long) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(CardShape)
             .background(SurfaceSoft)
-            .padding(horizontal = 4.dp, vertical = 8.dp)
-            .then(
-                if (uiState.monthExpanded) {
-                    Modifier.verticalSwipe(onSwipeUp = onCollapse)
-                } else {
-                    Modifier.verticalSwipe(onSwipeDown = onExpand)
-                },
-            ),
+            .bidirectionalSwipe(
+                onSwipeLeft = { onShiftDay(1) },
+                onSwipeRight = { onShiftDay(-1) },
+                onSwipeUp = if (uiState.monthExpanded) onCollapse else null,
+                onSwipeDown = if (!uiState.monthExpanded) onExpand else null,
+            )
+            .padding(horizontal = 4.dp, vertical = 8.dp),
     ) {
         AnimatedVisibility(
             visible = !uiState.monthExpanded,
@@ -247,15 +318,34 @@ private fun CalendarStrip(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                uiState.weekDates.forEach { date ->
-                    WeekDayCell(
-                        date = date,
-                        today = today,
-                        selected = date == uiState.selectedDate,
-                        dots = uiState.dayDots[date].orEmpty(),
-                        onClick = { onSelectDate(date) },
-                        modifier = Modifier.weight(1f),
-                    )
+                AnimatedContent(
+                    targetState = WeekStripPage(
+                        weekDates = uiState.weekDates,
+                        selectedDate = uiState.selectedDate,
+                        dayDots = uiState.dayDots,
+                    ),
+                    contentKey = { it.weekDates.firstOrNull() },
+                    transitionSpec = { weekSlideTransition() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .clipToBounds(),
+                    label = "week-strip",
+                ) { page ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        page.weekDates.forEach { date ->
+                            WeekDayCell(
+                                date = date,
+                                today = today,
+                                selected = date == page.selectedDate,
+                                dots = page.dayDots[date].orEmpty(),
+                                onClick = { onSelectDate(date) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
                 IconButton(
                     onClick = onToggleExpand,
@@ -533,3 +623,21 @@ private fun formatSelectedTitle(date: LocalDate, today: LocalDate): String {
         else -> base
     }
 }
+
+private fun AnimatedContentTransitionScope<DayPage>.daySlideTransition(): ContentTransform =
+    horizontalSlideTransition(forward = targetState.date > initialState.date)
+
+private fun AnimatedContentTransitionScope<WeekStripPage>.weekSlideTransition(): ContentTransform =
+    horizontalSlideTransition(
+        forward = (targetState.weekDates.firstOrNull() ?: targetState.selectedDate) >
+            (initialState.weekDates.firstOrNull() ?: initialState.selectedDate),
+    )
+
+private fun horizontalSlideTransition(forward: Boolean): ContentTransform =
+    if (forward) {
+        (slideInHorizontally(animationSpec = tween(DaySlideMs)) { it / 3 } + fadeIn(tween(DaySlideMs))) togetherWith
+            (slideOutHorizontally(animationSpec = tween(DaySlideMs)) { -it / 3 } + fadeOut(tween(DaySlideMs)))
+    } else {
+        (slideInHorizontally(animationSpec = tween(DaySlideMs)) { -it / 3 } + fadeIn(tween(DaySlideMs))) togetherWith
+            (slideOutHorizontally(animationSpec = tween(DaySlideMs)) { it / 3 } + fadeOut(tween(DaySlideMs)))
+    }

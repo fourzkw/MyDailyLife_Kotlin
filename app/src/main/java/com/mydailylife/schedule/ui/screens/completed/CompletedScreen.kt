@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -18,20 +19,26 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mydailylife.schedule.data.ScheduleItem
+import com.mydailylife.schedule.ui.components.DeleteScheduleDialog
 import com.mydailylife.schedule.ui.components.ScheduleCard
 import com.mydailylife.schedule.ui.components.SectionHeader
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
+import com.mydailylife.schedule.ui.theme.PriorityUrgent
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import kotlinx.coroutines.launch
 
@@ -45,6 +52,46 @@ fun CompletedScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var pendingDelete by remember { mutableStateOf<ScheduleItem?>(null) }
+    var showClearConfirm by remember { mutableStateOf(false) }
+
+    pendingDelete?.let { item ->
+        DeleteScheduleDialog(
+            item = item,
+            onDeleteEntire = {
+                viewModel.delete(item.id)
+                pendingDelete = null
+                scope.launch { snackbar.showSnackbar("已删除") }
+            },
+            onDismiss = { pendingDelete = null },
+        )
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text("清空已完成") },
+            text = {
+                Text("确定删除全部 ${uiState.items.size} 个已完成事项吗？此操作不可恢复。")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearConfirm = false
+                        viewModel.clearCompleted()
+                        scope.launch { snackbar.showSnackbar("已清空完成事项") }
+                    },
+                ) {
+                    Text("清空", color = PriorityUrgent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) {
+                    Text("取消")
+                }
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -74,10 +121,7 @@ fun CompletedScreen(
                 title = "已完成",
                 action = if (uiState.items.isNotEmpty()) "清空" else null,
                 onAction = if (uiState.items.isNotEmpty()) {
-                    {
-                        viewModel.clearCompleted()
-                        scope.launch { snackbar.showSnackbar("已清空完成事项") }
-                    }
+                    { showClearConfirm = true }
                 } else {
                     null
                 },
@@ -98,6 +142,7 @@ fun CompletedScreen(
                                 viewModel.toggleCompleted(item.id)
                                 scope.launch { snackbar.showSnackbar("已恢复为未完成") }
                             },
+                            onDeleteClick = { pendingDelete = item },
                         )
                     }
                 }

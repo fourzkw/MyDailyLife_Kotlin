@@ -6,7 +6,7 @@ Kotlin/Compose rewrite of UniApp `MyDailyLife`. UI follows root `DESIGN.md` (Air
 
 - Kotlin, Jetpack Compose, Material3
 - Navigation Compose; ViewModels + `StateFlow`
-- Persistence: `ScheduleRepository` (JSON on device)
+- Persistence: `ScheduleRepository` / `SettingsRepository` (JSON on device)
 - JDK 21 for builds (`JAVA_HOME` may need setting on Windows)
 
 ## Layout
@@ -29,7 +29,7 @@ Bottom tabs: **日程** / **课表** / **统计** / **设置**.
 
 - Schedule merges former 事项 + 日历: week strip by default; pull down on strip → month; swipe up on month → collapse; horizontal swipe changes day.
 - Daily list: pending items first; **已完成 · N** expandable section at bottom (same `ScheduleCard`).
-- `ScheduleCard`: short tap → edit; hold ~1.5s with green progress → toggle completed; release mid-hold cancels (no edit).
+- `ScheduleCard`: short tap → edit; double-tap → delete confirm; hold ~1s (pending) / ~0.5s (completed) with green progress → toggle completed.
 - Courses: swipe weeks; Statistics: aggregates; Create: add/edit schedule.
 
 Legacy screens (`calendar`, `items`, `completed`) may still exist but are not primary tabs.
@@ -89,4 +89,10 @@ gradlew.bat :app:assembleDebug
 
 ## Not done / optional later
 
-ICS import/export, reminders, settings persistence, fuller course editing parity with UniApp.
+ICS import/export, Daily/Weekly reminder recurrence, fuller course editing parity with UniApp.
+
+**Reminders (phase 1–2):** `ReminderScheduler` + `AlarmManager` for Once items; notification channel;
+settings toggle requests `POST_NOTIFICATIONS` and can guide exact-alarm / app notification settings.
+BootReceiver restarts process so alarms are re-registered.
+
+Settings prefs persist via `SettingsRepository` → `settings.json`.

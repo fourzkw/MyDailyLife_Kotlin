@@ -45,6 +45,18 @@ object ScheduleTimeFormat {
         }
     }
 
+    /** Blank → 0 (unset). Invalid text → null. */
+    fun parseOptional(text: String): Long? {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return 0L
+        return runCatching {
+            LocalDateTime.parse(trimmed, dateTimeFormatter).atZone(zone).toInstant().toEpochMilli()
+        }.getOrElse {
+            val relative = parseRelative(trimmed, Long.MIN_VALUE)
+            if (relative == Long.MIN_VALUE) null else relative
+        }
+    }
+
     private fun parseRelative(text: String, fallback: Long): Long {
         val now = LocalDateTime.now(zone)
         val match = Regex("""^(今天|明天|昨天)\s*(\d{1,2}):(\d{2})$""").matchEntire(text)

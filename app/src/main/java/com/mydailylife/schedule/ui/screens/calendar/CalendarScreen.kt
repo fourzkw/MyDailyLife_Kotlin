@@ -29,8 +29,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +43,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mydailylife.schedule.data.Priority
+import com.mydailylife.schedule.data.ScheduleItem
+import com.mydailylife.schedule.data.ScheduleTimeMode
+import com.mydailylife.schedule.ui.components.DeleteScheduleDialog
 import com.mydailylife.schedule.ui.components.PrimaryPillButton
 import com.mydailylife.schedule.ui.components.ScheduleCard
 import com.mydailylife.schedule.ui.components.SectionHeader
@@ -68,6 +73,31 @@ fun CalendarScreen(
     val scope = rememberCoroutineScope()
     val today = LocalDate.now()
     val month = uiState.month
+    var pendingDelete by remember { mutableStateOf<ScheduleItem?>(null) }
+
+    pendingDelete?.let { item ->
+        val canSkipDay = item.timeModeEnum == ScheduleTimeMode.Daily ||
+            item.timeModeEnum == ScheduleTimeMode.Weekly
+        DeleteScheduleDialog(
+            item = item,
+            occurrenceDate = uiState.selectedDate.takeIf { canSkipDay },
+            onDeleteThisDay = if (canSkipDay) {
+                {
+                    viewModel.deleteOccurrence(item.id, uiState.selectedDate)
+                    pendingDelete = null
+                    scope.launch { snackbar.showSnackbar("已删除当天") }
+                }
+            } else {
+                null
+            },
+            onDeleteEntire = {
+                viewModel.delete(item.id)
+                pendingDelete = null
+                scope.launch { snackbar.showSnackbar("已删除") }
+            },
+            onDismiss = { pendingDelete = null },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -184,6 +214,7 @@ fun CalendarScreen(
                                 )
                             }
                         },
+                        onDeleteClick = { pendingDelete = item },
                     )
                 }
             }

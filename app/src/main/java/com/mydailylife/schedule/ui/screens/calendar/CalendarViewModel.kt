@@ -69,6 +69,14 @@ class CalendarViewModel(
         viewModelScope.launch { repository.toggleCompleted(id) }
     }
 
+    fun delete(id: String) {
+        viewModelScope.launch { repository.delete(id) }
+    }
+
+    fun deleteOccurrence(id: String, date: LocalDate) {
+        viewModelScope.launch { repository.excludeOccurrence(id, date) }
+    }
+
     companion object {
         fun factory(repository: ScheduleRepository): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {

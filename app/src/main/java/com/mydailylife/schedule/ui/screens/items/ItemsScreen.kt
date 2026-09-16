@@ -16,17 +16,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mydailylife.schedule.data.ScheduleItem
+import com.mydailylife.schedule.data.ScheduleTimeMode
+import com.mydailylife.schedule.ui.components.DeleteScheduleDialog
 import com.mydailylife.schedule.ui.components.MdlFab
 import com.mydailylife.schedule.ui.components.MdlFilterChips
 import com.mydailylife.schedule.ui.components.MdlSearchPill
 import com.mydailylife.schedule.ui.components.ScheduleCard
 import com.mydailylife.schedule.ui.components.SectionHeader
 import com.mydailylife.schedule.ui.theme.Muted
+import java.time.LocalDate
 
 @Composable
 fun ItemsScreen(
@@ -37,11 +43,35 @@ fun ItemsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    var pendingDelete by remember { mutableStateOf<ScheduleItem?>(null) }
 
     LaunchedEffect(uiState.message) {
         val msg = uiState.message ?: return@LaunchedEffect
         snackbar.showSnackbar(msg)
         viewModel.consumeMessage()
+    }
+
+    pendingDelete?.let { item ->
+        val today = LocalDate.now()
+        val canSkipDay = item.timeModeEnum == ScheduleTimeMode.Daily ||
+            item.timeModeEnum == ScheduleTimeMode.Weekly
+        DeleteScheduleDialog(
+            item = item,
+            occurrenceDate = today.takeIf { canSkipDay },
+            onDeleteThisDay = if (canSkipDay) {
+                {
+                    viewModel.deleteOccurrence(item.id, today)
+                    pendingDelete = null
+                }
+            } else {
+                null
+            },
+            onDeleteEntire = {
+                viewModel.delete(item.id)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null },
+        )
     }
 
     Scaffold(
@@ -85,6 +115,7 @@ fun ItemsScreen(
                             item = item,
                             onClick = { onEdit(item.id) },
                             onLongClick = { viewModel.toggleCompleted(item.id) },
+                            onDeleteClick = { pendingDelete = item },
                         )
                     }
                 }

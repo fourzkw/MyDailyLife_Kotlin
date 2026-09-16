@@ -8,7 +8,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,15 +28,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +53,8 @@ import androidx.compose.ui.unit.dp
 import com.mydailylife.schedule.data.Priority
 import com.mydailylife.schedule.data.ScheduleItem
 import com.mydailylife.schedule.data.ScheduleTimeFormat
+import com.mydailylife.schedule.data.ScheduleTimeMode
+import com.mydailylife.schedule.data.WeekdayLabels
 import com.mydailylife.schedule.ui.theme.Body
 import com.mydailylife.schedule.ui.theme.ButtonShape
 import com.mydailylife.schedule.ui.theme.CardShape
@@ -70,6 +75,11 @@ import com.mydailylife.schedule.ui.theme.Rausch
 import com.mydailylife.schedule.ui.theme.RauschSoft
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import com.mydailylife.schedule.ui.theme.SurfaceStrong
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlin.math.hypot
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -143,8 +153,102 @@ fun MdlFilterChips(
     }
 }
 
-private const val LongPressCompleteMs = 1500
-private const val TapMaxMs = 250L
+private const val LongPressCompleteMs = 1000
+private const val LongPressUncompleteMs = 500
+/** Delay before long-press progress starts; also used to separate tap from hold. */
+private const val LongPressArmDelayMs = 80L
+
+private fun scheduleTimeSubtitle(item: ScheduleItem): String {
+    val mode = item.timeModeEnum
+    val modeLabel = when (mode) {
+        ScheduleTimeMode.Weekly -> {
+            val days = WeekdayLabels
+                .filter { it.first.value in item.weekdays }
+                .joinToString("") { it.second }
+            if (days.isEmpty()) mode.label else "${mode.label} $days"
+        }
+        else -> mode.label
+    }
+    val start = ScheduleTimeFormat.formatDisplay(item.startTimeMillis)
+    val end = ScheduleTimeFormat.formatDisplay(item.endTimeMillis)
+    val range = when {
+        start.isNotBlank() && end.isNotBlank() -> "$start – $end"
+        start.isNotBlank() -> start
+        end.isNotBlank() -> end
+        else -> ""
+    }
+    return when {
+        mode == ScheduleTimeMode.Unlimited -> modeLabel
+        range.isBlank() -> modeLabel
+        mode == ScheduleTimeMode.Once -> range
+        else -> "$modeLabel · $range"
+    }
+}
+
+@Composable
+fun DeleteScheduleDialog(
+    item: ScheduleItem,
+    occurrenceDate: LocalDate? = null,
+    onDeleteThisDay: (() -> Unit)? = null,
+    onDeleteEntire: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val canSkipDay = onDeleteThisDay != null &&
+        occurrenceDate != null &&
+        (
+            item.timeModeEnum == ScheduleTimeMode.Daily ||
+                item.timeModeEnum == ScheduleTimeMode.Weekly
+            )
+    val dateLabel = occurrenceDate?.let {
+        DateTimeFormatter.ofPattern("M月d日", Locale.CHINA).format(it)
+    }.orEmpty()
+    val seriesLabel = when (item.timeModeEnum) {
+        ScheduleTimeMode.Daily -> "全部每天重复"
+        ScheduleTimeMode.Weekly -> "全部每周重复"
+        else -> "整条事项"
+    }
+    val bodyText = when {
+        canSkipDay -> "这是重复事项，请选择删除范围："
+        item.timeModeEnum == ScheduleTimeMode.Unlimited ->
+            "该事项每天都会显示；删除后将从所有日期移除，此操作不可恢复。"
+        else -> "确定删除该事项吗？此操作不可恢复。"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("删除「${item.title}」") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = bodyText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (canSkipDay) Muted else Ink,
+                )
+            }
+        },
+        confirmButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                if (canSkipDay) {
+                    TextButton(onClick = onDeleteThisDay!!) {
+                        Text("仅删除 $dateLabel", color = PriorityUrgent)
+                    }
+                    TextButton(onClick = onDeleteEntire) {
+                        Text("删除$seriesLabel", color = PriorityUrgent)
+                    }
+                } else {
+                    TextButton(onClick = onDeleteEntire) {
+                        Text("删除", color = PriorityUrgent)
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        },
+    )
+}
 
 @Composable
 fun ScheduleCard(
@@ -152,15 +256,17 @@ fun ScheduleCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    /** Invoked on double-tap; typically opens the delete confirmation dialog. */
+    onDeleteClick: (() -> Unit)? = null,
 ) {
-    val timeText = when {
-        item.startTimeMillis > 0L -> ScheduleTimeFormat.formatDisplay(item.startTimeMillis)
-        item.endTimeMillis > 0L -> ScheduleTimeFormat.formatDisplay(item.endTimeMillis)
-        else -> ""
-    }
+    val timeText = scheduleTimeSubtitle(item)
     val priority = item.priorityEnum
     val progress = remember(item.id) { Animatable(0f) }
     val scope = rememberCoroutineScope()
+
+    val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnLongClick by rememberUpdatedState(onLongClick)
+    val currentOnDeleteClick by rememberUpdatedState(onDeleteClick)
 
     Box(
         modifier = modifier
@@ -168,37 +274,89 @@ fun ScheduleCard(
             .clip(CardShape)
             .background(SurfaceSoft)
             .then(
-                if (onClick != null || onLongClick != null) {
-                    Modifier.pointerInput(item.id, onClick, onLongClick) {
+                if (onClick != null || onLongClick != null || onDeleteClick != null) {
+                    Modifier.pointerInput(item.id, item.completed) {
+                        val touchSlop = viewConfiguration.touchSlop
+                        val doubleTapTimeout = viewConfiguration.doubleTapTimeoutMillis
+                        var pendingSingleTap: Job? = null
                         awaitEachGesture {
-                            awaitFirstDown(requireUnconsumed = false)
-                            val downTime = System.currentTimeMillis()
+                            val down = awaitFirstDown(requireUnconsumed = false)
                             var longPressFired = false
+                            var longPressArmed = false
+                            var scrolledAway = false
+                            var lastDx = 0f
+                            var lastDy = 0f
+                            val holdMs = if (item.completed) {
+                                LongPressUncompleteMs
+                            } else {
+                                LongPressCompleteMs
+                            }
                             val pressJob = scope.launch {
-                                if (onLongClick == null) return@launch
-                                delay(TapMaxMs)
+                                if (currentOnLongClick == null) return@launch
+                                delay(LongPressArmDelayMs)
+                                if (scrolledAway) return@launch
+                                longPressArmed = true
+                                pendingSingleTap?.cancel()
+                                pendingSingleTap = null
                                 progress.snapTo(0f)
                                 progress.animateTo(
                                     targetValue = 1f,
                                     animationSpec = tween(
-                                        durationMillis = LongPressCompleteMs,
+                                        durationMillis = holdMs,
                                         easing = LinearEasing,
                                     ),
                                 )
+                                if (scrolledAway) return@launch
                                 longPressFired = true
-                                onLongClick()
+                                currentOnLongClick?.invoke()
                                 delay(300)
                                 progress.snapTo(0f)
                             }
-                            val up = waitForUpOrCancellation()
-                            if (!longPressFired) {
-                                pressJob.cancel()
-                                scope.launch { progress.snapTo(0f) }
-                                val elapsed = System.currentTimeMillis() - downTime
-                                // Only open edit on a short tap; mid long-press release does nothing
-                                if (up != null && onClick != null && elapsed < TapMaxMs) {
-                                    onClick()
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull() ?: break
+                                    if (!change.pressed) break
+                                    val dx = change.position.x - down.position.x
+                                    val dy = change.position.y - down.position.y
+                                    lastDx = dx
+                                    lastDy = dy
+                                    if (!scrolledAway) {
+                                        val adx = kotlin.math.abs(dx)
+                                        val ady = kotlin.math.abs(dy)
+                                        if (adx > touchSlop || ady > touchSlop) {
+                                            scrolledAway = true
+                                            pressJob.cancel()
+                                            scope.launch { progress.snapTo(0f) }
+                                        }
+                                    }
                                 }
+                            } finally {
+                                pressJob.cancel()
+                            }
+
+                            if (longPressFired) {
+                                scope.launch { progress.snapTo(0f) }
+                                return@awaitEachGesture
+                            }
+                            scope.launch { progress.snapTo(0f) }
+                            if (longPressArmed || scrolledAway) return@awaitEachGesture
+
+                            val moved = hypot(lastDx.toDouble(), lastDy.toDouble())
+                            if (moved > touchSlop) return@awaitEachGesture
+
+                            // Double-tap → delete; single tap (after timeout) → edit.
+                            if (pendingSingleTap?.isActive == true) {
+                                pendingSingleTap?.cancel()
+                                pendingSingleTap = null
+                                currentOnDeleteClick?.invoke()
+                            } else if (currentOnDeleteClick != null) {
+                                pendingSingleTap = scope.launch {
+                                    delay(doubleTapTimeout)
+                                    currentOnClick?.invoke()
+                                }
+                            } else {
+                                currentOnClick?.invoke()
                             }
                         }
                     }
@@ -291,6 +449,7 @@ fun ScheduleCard(
         }
     }
 }
+
 
 @Composable
 fun MdlFab(

@@ -1,7 +1,16 @@
 ﻿package com.mydailylife.schedule.ui.screens.settings
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,34 +18,260 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mydailylife.schedule.asMdlApp
+import com.mydailylife.schedule.data.AppSettings
+import com.mydailylife.schedule.data.Priority
+import com.mydailylife.schedule.reminder.ReminderPermission
 import com.mydailylife.schedule.ui.components.SectionHeader
 import com.mydailylife.schedule.ui.components.SettingsRow
 import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
+import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
+import com.mydailylife.schedule.ui.theme.PillShape
+import com.mydailylife.schedule.ui.theme.Rausch
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
+import com.mydailylife.schedule.ui.theme.SurfaceStrong
 import kotlinx.coroutines.launch
 
+private enum class SettingsDialog {
+    Reminder,
+    Priority,
+    Tags,
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen() {
-    var notifications by remember { mutableStateOf(true) }
-    var courseAutoUpdate by remember { mutableStateOf(false) }
+fun SettingsScreen(
+    viewModel: SettingsViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val app = context.applicationContext.asMdlApp()
+    var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
+    var newTag by remember { mutableStateOf("") }
+    var showOpenSettingsDialog by remember { mutableStateOf(false) }
+    var showExactAlarmDialog by remember { mutableStateOf(false) }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            viewModel.setNotificationsEnabled(true)
+            if (!app.reminderScheduler.canScheduleExactAlarms()) {
+                showExactAlarmDialog = true
+            } else {
+                scope.launch { snackbar.showSnackbar("已开启通知提醒") }
+            }
+        } else {
+            showOpenSettingsDialog = true
+        }
+    }
+
+    fun enableNotifications() {
+        when {
+            ReminderPermission.hasNotificationPermission(context) -> {
+                viewModel.setNotificationsEnabled(true)
+                if (!app.reminderScheduler.canScheduleExactAlarms()) {
+                    showExactAlarmDialog = true
+                } else {
+                    scope.launch { snackbar.showSnackbar("已开启通知提醒") }
+                }
+            }
+            ReminderPermission.needsNotificationPermission() -> {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            else -> {
+                showOpenSettingsDialog = true
+            }
+        }
+    }
+
+    fun onNotificationsCheckedChange(enabled: Boolean) {
+        if (enabled) {
+            enableNotifications()
+        } else {
+            viewModel.setNotificationsEnabled(false)
+            scope.launch { snackbar.showSnackbar("已关闭通知提醒") }
+        }
+    }
+
+    if (showOpenSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showOpenSettingsDialog = false },
+            title = { Text("需要通知权限") },
+            text = {
+                Text("请在系统设置中允许通知，以便准时提醒日程。")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOpenSettingsDialog = false
+                        context.startActivity(ReminderPermission.appNotificationSettingsIntent(context))
+                    },
+                ) { Text("去设置") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOpenSettingsDialog = false }) { Text("取消") }
+            },
+        )
+    }
+
+    if (showExactAlarmDialog) {
+        AlertDialog(
+            onDismissRequest = { showExactAlarmDialog = false },
+            title = { Text("建议开启精确闹钟") },
+            text = {
+                Text("系统限制了精确闹钟时，提醒可能略有延迟。可在设置中允许本应用使用闹钟与提醒。")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExactAlarmDialog = false
+                        context.startActivity(ReminderPermission.exactAlarmSettingsIntent(context))
+                    },
+                ) { Text("去开启") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExactAlarmDialog = false }) { Text("稍后") }
+            },
+        )
+    }
+
+    when (dialog) {
+        SettingsDialog.Reminder -> {
+            ChoiceDialog(
+                title = "默认提前提醒",
+                options = AppSettings.ReminderMinuteOptions.map {
+                    it to AppSettings.reminderLabel(it)
+                },
+                selectedKey = uiState.reminderBeforeMinutes,
+                onDismiss = { dialog = null },
+                onSelect = { minutes ->
+                    viewModel.setReminderBeforeMinutes(minutes)
+                    dialog = null
+                },
+            )
+        }
+        SettingsDialog.Priority -> {
+            ChoiceDialog(
+                title = "默认优先级",
+                options = Priority.entries.map { it to it.label },
+                selectedKey = uiState.defaultPriority,
+                onDismiss = { dialog = null },
+                onSelect = { priority ->
+                    viewModel.setDefaultPriority(priority)
+                    dialog = null
+                },
+            )
+        }
+        SettingsDialog.Tags -> {
+            AlertDialog(
+                onDismissRequest = {
+                    dialog = null
+                    newTag = ""
+                },
+                title = { Text("标签管理") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (uiState.presetTags.isEmpty()) {
+                            Text("暂无预设标签", color = Muted)
+                        } else {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                uiState.presetTags.forEach { tag ->
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(PillShape)
+                                            .background(SurfaceStrong)
+                                            .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(tag, style = MaterialTheme.typography.labelMedium, color = Ink)
+                                        IconButton(
+                                            onClick = { viewModel.removeTag(tag) },
+                                            modifier = Modifier.height(28.dp),
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = "删除 $tag",
+                                                tint = Muted,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = newTag,
+                            onValueChange = { newTag = it },
+                            singleLine = true,
+                            label = { Text("新标签") },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.addTag(newTag)
+                            newTag = ""
+                        },
+                    ) { Text("添加") }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            dialog = null
+                            newTag = ""
+                        },
+                    ) { Text("完成") }
+                },
+            )
+        }
+        null -> Unit
+    }
+
+    val notificationSubtitle = when {
+        !uiState.notificationsEnabled -> "关闭后不会弹出本地提醒"
+        !ReminderPermission.hasNotificationPermission(context) ->
+            "系统通知权限未开启，再次打开开关可重新授权"
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            !app.reminderScheduler.canScheduleExactAlarms() ->
+            "已启用；精确闹钟未授权，提醒可能延迟"
+        else -> "已启用「仅一次」事项的本地提醒"
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -52,17 +287,15 @@ fun SettingsScreen() {
             SettingsGroup(title = "通知") {
                 SettingsRow(
                     title = "启用通知",
-                    subtitle = "日程与课程本地提醒",
-                    checked = notifications,
-                    onCheckedChange = { notifications = it },
+                    subtitle = notificationSubtitle,
+                    checked = uiState.notificationsEnabled,
+                    onCheckedChange = ::onNotificationsCheckedChange,
                 )
                 HorizontalDivider(color = Hairline)
                 SettingsRow(
                     title = "默认提前提醒",
-                    trailingText = "15 分钟",
-                    onClick = {
-                        scope.launch { snackbar.showSnackbar("设置持久化将在下一阶段接入") }
-                    },
+                    trailingText = uiState.reminderLabel,
+                    onClick = { dialog = SettingsDialog.Reminder },
                 )
             }
 
@@ -70,17 +303,18 @@ fun SettingsScreen() {
             SettingsGroup(title = "默认值") {
                 SettingsRow(
                     title = "默认优先级",
-                    trailingText = "中",
-                    onClick = {
-                        scope.launch { snackbar.showSnackbar("设置持久化将在下一阶段接入") }
-                    },
+                    trailingText = uiState.priorityLabel,
+                    onClick = { dialog = SettingsDialog.Priority },
                 )
                 HorizontalDivider(color = Hairline)
                 SettingsRow(
                     title = "标签管理",
-                    onClick = {
-                        scope.launch { snackbar.showSnackbar("标签管理将在下一阶段接入") }
+                    subtitle = if (uiState.presetTags.isEmpty()) {
+                        "暂无预设"
+                    } else {
+                        "${uiState.presetTags.size} 个预设"
                     },
+                    onClick = { dialog = SettingsDialog.Tags },
                 )
             }
 
@@ -88,27 +322,57 @@ fun SettingsScreen() {
             SettingsGroup(title = "课表") {
                 SettingsRow(
                     title = "自动更新课表",
-                    subtitle = "按间隔刷新 ICS 订阅",
-                    checked = courseAutoUpdate,
-                    onCheckedChange = { courseAutoUpdate = it },
+                    subtitle = "按间隔刷新 ICS 订阅（导入后续接入）",
+                    checked = uiState.courseAutoUpdate,
+                    onCheckedChange = viewModel::setCourseAutoUpdate,
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
             SettingsGroup(title = "关于") {
-                SettingsRow(title = "版本", trailingText = "1.0 (UI 壳)")
-                HorizontalDivider(color = Hairline)
-                SettingsRow(
-                    title = "使用指南",
-                    onClick = {
-                        scope.launch { snackbar.showSnackbar("外链将在下一阶段接入") }
-                    },
-                )
+                SettingsRow(title = "版本", trailingText = "1.0")
             }
             Spacer(modifier = Modifier.height(24.dp))
         }
         SnackbarHost(hostState = snackbar, modifier = Modifier.padding(16.dp))
     }
+}
+
+@Composable
+private fun <T> ChoiceDialog(
+    title: String,
+    options: List<Pair<T, String>>,
+    selectedKey: T,
+    onDismiss: () -> Unit,
+    onSelect: (T) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                options.forEach { (key, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(key) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = key == selectedKey,
+                            onClick = { onSelect(key) },
+                            colors = RadioButtonDefaults.colors(selectedColor = Rausch),
+                        )
+                        Text(label, style = MaterialTheme.typography.bodyLarge, color = Ink)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }
 
 @Composable

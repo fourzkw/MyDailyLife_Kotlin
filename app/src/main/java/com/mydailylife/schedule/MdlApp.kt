@@ -9,13 +9,19 @@ import com.mydailylife.schedule.ui.theme.Canvas
 import com.mydailylife.schedule.ui.theme.MyDailyLifeTheme
 
 @Composable
-fun MdlApp() {
+fun MdlApp(
+    openScheduleId: String? = null,
+    onOpenScheduleConsumed: () -> Unit = {},
+) {
     MyDailyLifeTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Canvas,
         ) {
-            MdlNavHost()
+            MdlNavHost(
+                openScheduleId = openScheduleId,
+                onOpenScheduleConsumed = onOpenScheduleConsumed,
+            )
         }
     }
 }
