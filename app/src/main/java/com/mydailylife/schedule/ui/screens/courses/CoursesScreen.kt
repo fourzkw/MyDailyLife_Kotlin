@@ -17,10 +17,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,12 +47,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mydailylife.schedule.data.AcademicSemester
@@ -63,18 +68,30 @@ import com.mydailylife.schedule.ui.components.horizontalSwipe
 import com.mydailylife.schedule.ui.theme.Body
 import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
+import com.mydailylife.schedule.ui.theme.HairlineSoft
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.OnSoftPrimary
+import com.mydailylife.schedule.ui.theme.PriorityHigh
+import com.mydailylife.schedule.ui.theme.PriorityLow
+import com.mydailylife.schedule.ui.theme.PriorityMedium
+import com.mydailylife.schedule.ui.theme.PriorityUrgent
 import com.mydailylife.schedule.ui.theme.Rausch
 import com.mydailylife.schedule.ui.theme.RauschSoft
+import com.mydailylife.schedule.ui.theme.SurfaceCard
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
+import com.mydailylife.schedule.ui.theme.SurfaceStrong
+import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+/** Wide enough for "08:30" on one line at label size. */
+private val TimeGutterWidth = 48.dp
+private val SlotHeight = 56.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +103,6 @@ fun CoursesScreen(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val slotHeight = 52.dp
     val today = LocalDate.now()
     val weekDates = uiState.weekDates.ifEmpty {
         val monday = com.mydailylife.schedule.data.CourseRepository.todayMonday()
@@ -97,6 +113,7 @@ fun CoursesScreen(
     val rangeFormatter = DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
     val weekRange = "${weekStart.format(rangeFormatter)} – ${weekEnd.format(rangeFormatter)}"
     val teachingLabel = "第${uiState.teachingWeek}周"
+    val isCurrentWeek = uiState.teachingWeek == currentTeachingWeekHint(uiState)
 
     var showImportSheet by remember { mutableStateOf(false) }
     var showIcsPlaceholder by remember { mutableStateOf(false) }
@@ -268,11 +285,7 @@ fun CoursesScreen(
             ) {
                 SectionHeader(
                     title = "课表",
-                    action = if (uiState.teachingWeek == currentTeachingWeekHint(uiState)) {
-                        "本周"
-                    } else {
-                        teachingLabel
-                    },
+                    action = if (isCurrentWeek) "本周" else "回到本周",
                     onAction = { viewModel.goCurrentTeachingWeek() },
                     modifier = Modifier.weight(1f),
                 )
@@ -284,59 +297,51 @@ fun CoursesScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "$teachingLabel · $weekRange",
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted,
+
+            Spacer(modifier = Modifier.height(10.dp))
+            WeekNavigatorCard(
+                teachingLabel = teachingLabel,
+                weekRange = weekRange,
+                isCurrentWeek = isCurrentWeek,
+                canGoPrev = uiState.teachingWeek > 1,
+                canGoNext = uiState.teachingWeek < uiState.maxTeachingWeek,
+                onPrev = { viewModel.shiftTeachingWeek(-1) },
+                onNext = { viewModel.shiftTeachingWeek(1) },
             )
+
             Spacer(modifier = Modifier.height(12.dp))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Spacer(modifier = Modifier.width(40.dp))
-                weekDates.forEach { date ->
-                    val isToday = date == today
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            text = CourseGridDefaults.weekdayLabels[date.dayOfWeek.value - 1],
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isToday) OnSoftPrimary else Muted,
-                            fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                        Text(
-                            text = "${date.monthValue}/${date.dayOfMonth}",
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isToday) OnSoftPrimary else Ink,
-                            fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .verticalScroll(rememberScrollState()),
+                    .fillMaxWidth()
+                    .clip(CardShape)
+                    .background(SurfaceCard)
+                    .border(1.dp, HairlineSoft, CardShape)
+                    .padding(top = 10.dp, bottom = 8.dp),
             ) {
-                if (uiState.visibleCourses.isEmpty() && uiState.courses.isNotEmpty()) {
-                    Text(
-                        text = "第${uiState.teachingWeek}周暂无课程，左右滑动切换教学周",
-                        color = Muted,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 16.dp),
+                WeekdayHeaderRow(weekDates = weekDates, today = today)
+                Spacer(modifier = Modifier.height(6.dp))
+                HorizontalDivider(color = HairlineSoft)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = 4.dp),
+                ) {
+                    if (uiState.visibleCourses.isEmpty()) {
+                        EmptyWeekHint(
+                            hasAnyCourses = uiState.courses.isNotEmpty(),
+                            teachingWeek = uiState.teachingWeek,
+                        )
+                    }
+                    CourseGrid(
+                        courses = uiState.visibleCourses,
+                        weekDates = weekDates,
+                        today = today,
+                        slotHeight = SlotHeight,
+                        onCourseClick = { detailCourse = it },
                     )
                 }
-                CourseGrid(
-                    courses = uiState.visibleCourses,
-                    slotHeight = slotHeight,
-                    onCourseClick = { detailCourse = it },
-                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -409,14 +414,143 @@ private fun CourseSettingsSheet(
 }
 
 @Composable
+private fun WeekNavigatorCard(
+    teachingLabel: String,
+    weekRange: String,
+    isCurrentWeek: Boolean,
+    canGoPrev: Boolean,
+    canGoNext: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(CardShape)
+            .background(if (isCurrentWeek) RauschSoft else SurfaceStrong)
+            .border(
+                1.dp,
+                if (isCurrentWeek) Rausch.copy(alpha = 0.22f) else HairlineSoft,
+                CardShape,
+            )
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(
+            onClick = onPrev,
+            enabled = canGoPrev,
+            modifier = Modifier.size(40.dp),
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                contentDescription = "上一周",
+                tint = if (canGoPrev) Ink else Muted.copy(alpha = 0.4f),
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = teachingLabel,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (isCurrentWeek) OnSoftPrimary else Ink,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = weekRange,
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+            )
+        }
+        IconButton(
+            onClick = onNext,
+            enabled = canGoNext,
+            modifier = Modifier.size(40.dp),
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "下一周",
+                tint = if (canGoNext) Ink else Muted.copy(alpha = 0.4f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeekdayHeaderRow(
+    weekDates: List<LocalDate>,
+    today: LocalDate,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(modifier = Modifier.width(TimeGutterWidth))
+        weekDates.forEach { date ->
+            val isToday = date == today
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(CardShape)
+                    .background(if (isToday) RauschSoft else Color.Transparent)
+                    .padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = CourseGridDefaults.weekdayLabels[date.dayOfWeek.value - 1],
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isToday) OnSoftPrimary else Muted,
+                    fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
+                )
+                Text(
+                    text = "${date.dayOfMonth}",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (isToday) OnSoftPrimary else Ink,
+                    fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyWeekHint(
+    hasAnyCourses: Boolean,
+    teachingWeek: Int,
+) {
+    Text(
+        text = if (hasAnyCourses) {
+            "第${teachingWeek}周暂无课程，左右滑动或点箭头切换"
+        } else {
+            "还没有课表，点下方导入"
+        },
+        color = Muted,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        textAlign = TextAlign.Center,
+    )
+}
+
+@Composable
 private fun CourseGrid(
     courses: List<CourseItem>,
+    weekDates: List<LocalDate>,
+    today: LocalDate,
     slotHeight: Dp,
     onCourseClick: (CourseItem) -> Unit,
 ) {
-    Box {
+    val todayIndex = weekDates.indexOfFirst { it == today }
+    Box(modifier = Modifier.padding(horizontal = 8.dp)) {
         Column {
-            CourseGridDefaults.timeSlots.forEach { time ->
+            CourseGridDefaults.timeSlots.forEachIndexed { index, time ->
+                val isBreakAfter = index == 3 || index == 8
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -425,29 +559,68 @@ private fun CourseGrid(
                 ) {
                     Text(
                         text = time,
-                        modifier = Modifier.width(40.dp),
-                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .width(TimeGutterWidth)
+                            .padding(top = 2.dp, end = 4.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 14.sp,
+                        ),
                         color = Muted,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
+                        textAlign = TextAlign.End,
                     )
-                    repeat(7) {
+                    repeat(7) { dayIndex ->
+                        val isTodayCol = dayIndex == todayIndex
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .border(0.5.dp, Hairline),
+                                .background(
+                                    if (isTodayCol) RauschSoft.copy(alpha = 0.45f)
+                                    else Color.Transparent,
+                                )
+                                .border(0.5.dp, HairlineSoft),
                         )
                     }
+                }
+                if (isBreakAfter) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = TimeGutterWidth)
+                            .height(6.dp)
+                            .background(SurfaceStrong),
+                    )
                 }
             }
         }
 
+        // Break bands shift subsequent blocks; account for gaps after slot 4 and 9 (0-based 3, 8).
+        fun topOffset(startSlot: Int): Dp {
+            var extra = 0.dp
+            if (startSlot > 4) extra += 6.dp
+            if (startSlot > 9) extra += 6.dp
+            return slotHeight * (startSlot - 1) + extra
+        }
+
+        fun blockHeight(startSlot: Int, endSlot: Int): Dp {
+            var extra = 0.dp
+            if (startSlot <= 4 && endSlot > 4) extra += 6.dp
+            if (startSlot <= 9 && endSlot > 9) extra += 6.dp
+            return slotHeight * (endSlot - startSlot + 1) + extra
+        }
+
         courses.forEach { course ->
-            val top = slotHeight * (course.startSlot - 1)
-            val height = slotHeight * (course.endSlot - course.startSlot + 1)
+            val top = topOffset(course.startSlot)
+            val height = blockHeight(course.startSlot, course.endSlot)
+            val palette = courseBlockColors(course)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 40.dp)
+                    .padding(start = TimeGutterWidth)
                     .padding(top = top),
             ) {
                 repeat((course.weekday - 1).coerceAtLeast(0)) {
@@ -457,28 +630,40 @@ private fun CourseGrid(
                     modifier = Modifier
                         .weight(1f)
                         .height(height)
-                        .padding(2.dp)
+                        .padding(horizontal = 2.dp, vertical = 2.dp)
                         .clip(CardShape)
-                        .background(RauschSoft)
-                        .border(1.dp, Rausch.copy(alpha = 0.28f), CardShape)
-                        .clickable { onCourseClick(course) }
-                        .padding(4.dp),
+                        .background(palette.background)
+                        .border(1.dp, palette.border, CardShape)
+                        .clickable { onCourseClick(course) },
                 ) {
-                    Column {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .width(3.dp)
+                            .fillMaxHeight()
+                            .background(palette.accent),
+                    )
+                    Column(
+                        modifier = Modifier.padding(start = 7.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    ) {
                         Text(
                             text = course.title,
                             style = MaterialTheme.typography.labelSmall,
                             color = Ink,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
+                            lineHeight = 14.sp,
                         )
-                        Text(
-                            text = course.location.ifBlank { course.teacher },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Body,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        if (course.location.isNotBlank()) {
+                            Text(
+                                text = course.location,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = Body,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
                 repeat((7 - course.weekday).coerceAtLeast(0)) {
@@ -487,6 +672,40 @@ private fun CourseGrid(
             }
         }
     }
+}
+
+private data class CourseBlockPalette(
+    val background: Color,
+    val border: Color,
+    val accent: Color,
+)
+
+private fun courseBlockColors(course: CourseItem): CourseBlockPalette {
+    val accents = listOf(
+        Rausch,
+        PriorityUrgent,
+        PriorityHigh,
+        PriorityMedium,
+        PriorityLow,
+        Color(0xFF8BB8FF),
+        Color(0xFFB39DDB),
+    )
+    val fills = listOf(
+        RauschSoft,
+        Color(0xFFFFF0F3),
+        Color(0xFFFFF4EC),
+        Color(0xFFFFF8E8),
+        Color(0xFFEDF8F0),
+        Color(0xFFEEF4FF),
+        Color(0xFFF5F0FB),
+    )
+    val idx = abs(course.title.hashCode()) % accents.size
+    val accent = accents[idx]
+    return CourseBlockPalette(
+        background = fills[idx],
+        border = accent.copy(alpha = 0.28f),
+        accent = accent.copy(alpha = 0.85f),
+    )
 }
 
 @Composable

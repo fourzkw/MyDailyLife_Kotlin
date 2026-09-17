@@ -106,7 +106,7 @@ Also bump `versionCode` by **+1** whenever `versionName` changes.
 
 Settings 「版本」 reads `BuildConfig.VERSION_NAME` — never hardcode the string in UI.
 
-**Current:** `1.5.0` / `versionCode` 7 — term-start picker + course settings.
+**Current:** `1.5.1` / `versionCode` 8 — courses grid visual polish.
 
 ## Not done / optional later
 
