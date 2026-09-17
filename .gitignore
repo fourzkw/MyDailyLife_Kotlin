@@ -19,6 +19,7 @@ local.properties
 /课表
 课表.json
 **/my-table-detail*.json
+/北师大课程表
 
 # keystore
 keystore.properties

@@ -72,6 +72,8 @@ data class CourseStore(
     /** ISO date of Monday for teaching week 1; null = unknown. */
     val termStartDate: String? = null,
     val maxTeachingWeek: Int = 25,
+    /** Wall-clock times for each teaching period (editable in课表设置). */
+    val periodSchedule: CoursePeriodSchedule = CoursePeriodSchedule(),
 )
 
 enum class CourseImportMethod(
@@ -101,13 +103,11 @@ enum class AcademicSemester {
 
 object CourseGridDefaults {
     val weekdayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
-    /** Aligned with CQU maxSection (13). */
-    val timeSlots = listOf(
-        "08:30", "09:25", "10:25", "11:20",
-        "14:00", "14:55", "15:55", "16:50", "17:45",
-        "19:00", "19:55", "20:50", "21:45",
-    )
-    val slotCount: Int get() = timeSlots.size
+
+    /** Fallback when store has no schedule yet; matches 重大默认. */
+    val timeSlots: List<String> get() = CoursePeriodPresets.cqu.map { it.start }
+
+    val slotCount: Int get() = CoursePeriodPresets.cqu.size
 
     fun teachingWeekForDate(termStart: LocalDate, date: LocalDate): Int {
         val startMonday = termStart.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))

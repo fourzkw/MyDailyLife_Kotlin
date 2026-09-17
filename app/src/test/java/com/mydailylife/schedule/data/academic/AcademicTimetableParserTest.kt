@@ -56,6 +56,33 @@ class AcademicTimetableParserTest {
         assertEquals(listOf(1, 2), AcademicTimetableParser.parseTeachingWeekFormat("1-2"))
         assertEquals(listOf(6, 11), AcademicTimetableParser.parseTeachingWeekFormat("6,11"))
         assertEquals(listOf(10), AcademicTimetableParser.parseTeachingWeekFormat("10"))
+        assertEquals(
+            (1..16).toList(),
+            AcademicTimetableParser.parseTeachingWeekFormat("1-16周"),
+        )
+        assertEquals(
+            listOf(1, 3, 5, 7),
+            AcademicTimetableParser.parseTeachingWeekFormat("1-8单周"),
+        )
+    }
+
+    @Test
+    fun parsesBnuStyleDomGridCell() {
+        val payload = """
+            {"pageUrl":"https://zyfw.bnu.edu.cn/wsxk.xskcb10319.jsp","network":[],"domCourses":[
+              {"课程名":"高等数学","教师":"张三","地点":"教二101","星期":"1","开始节次":"1","结束节次":"2","节次":"1-2","周次":"1-16周","rawText":"高等数学 张三 教二101 1-16周"}
+            ]}
+        """.trimIndent()
+        val result = AcademicTimetableParser.parseCapturePayload(payload)
+        assertEquals(1, result.courses.size)
+        assertEquals("高等数学", result.courses[0].title)
+        assertEquals(1, result.courses[0].weekday)
+        assertEquals(1, result.courses[0].startSlot)
+        assertEquals(2, result.courses[0].endSlot)
+        assertEquals("教二101", result.courses[0].location)
+        assertEquals("张三", result.courses[0].teacher)
+        assertEquals((1..16).toList(), result.courses[0].teachingWeeks)
+        assertTrue(result.sourceHint.contains("dom"))
     }
 
     @Test

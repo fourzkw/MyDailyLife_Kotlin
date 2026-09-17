@@ -446,17 +446,17 @@ fun CoursesScreen(
         ) {
             CourseSettingsSheet(
                 termStartDate = uiState.termStartDate,
+                periodSchedule = uiState.periodSchedule,
                 icsSubscriptionUrl = uiState.icsSubscriptionUrl,
                 importing = uiState.importing,
                 hasCourses = uiState.courses.isNotEmpty(),
                 onSaveTermStart = {
                     viewModel.setTermStartDate(it)
-                    showCourseSettings = false
                 },
-                onApplyDefault = {
+                onApplyDefaultTermStart = {
                     viewModel.applyDefaultTermStart()
-                    showCourseSettings = false
                 },
+                onPeriodScheduleChange = { viewModel.setPeriodSchedule(it) },
                 onRefreshIcs = {
                     showCourseSettings = false
                     viewModel.refreshIcsSubscription()
@@ -465,6 +465,7 @@ fun CoursesScreen(
                     showCourseSettings = false
                     showClearConfirm = true
                 },
+                onDismiss = { showCourseSettings = false },
             )
         }
     }
@@ -533,6 +534,7 @@ fun CoursesScreen(
                         courses = uiState.visibleCourses,
                         weekDates = weekDates,
                         today = today,
+                        periodSchedule = uiState.periodSchedule,
                         slotHeight = SlotHeight,
                         draftSlots = draftSlots,
                         liveDraft = liveDraft,
@@ -576,13 +578,16 @@ private fun currentTeachingWeekHint(uiState: CoursesUiState): Int {
 @Composable
 private fun CourseSettingsSheet(
     termStartDate: LocalDate?,
+    periodSchedule: com.mydailylife.schedule.data.CoursePeriodSchedule,
     icsSubscriptionUrl: String,
     importing: Boolean,
     hasCourses: Boolean,
     onSaveTermStart: (LocalDate) -> Unit,
-    onApplyDefault: () -> Unit,
+    onApplyDefaultTermStart: () -> Unit,
+    onPeriodScheduleChange: (com.mydailylife.schedule.data.CoursePeriodSchedule) -> Unit,
     onRefreshIcs: () -> Unit,
     onClearCourses: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val initial = termStartDate ?: CourseGridDefaults.defaultTermStart()
     var draft by remember(termStartDate) {
@@ -597,10 +602,18 @@ private fun CourseSettingsSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp)
             .padding(bottom = 32.dp),
     ) {
-        Text("课表设置", style = MaterialTheme.typography.titleMedium, color = Ink)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("课表设置", style = MaterialTheme.typography.titleMedium, color = Ink)
+            TextButton(onClick = onDismiss) { Text("完成") }
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "$semesterLabel。默认：秋=9月第二周周一，春=2月第二周周一。",
@@ -608,6 +621,8 @@ private fun CourseSettingsSheet(
             color = Muted,
         )
         Spacer(modifier = Modifier.height(12.dp))
+        Text("学期起点", style = MaterialTheme.typography.titleSmall, color = Ink)
+        Spacer(modifier = Modifier.height(8.dp))
         TermStartEditor(
             selected = draft,
             onSelect = { draft = it },
@@ -618,9 +633,21 @@ private fun CourseSettingsSheet(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
         ) {
-            TextButton(onClick = onApplyDefault) { Text("恢复默认") }
-            TextButton(onClick = { onSaveTermStart(draft) }) { Text("保存") }
+            TextButton(onClick = {
+                onApplyDefaultTermStart()
+                draft = CourseGridDefaults.defaultTermStart()
+            }) { Text("恢复默认起点") }
+            TextButton(onClick = { onSaveTermStart(draft) }) { Text("保存起点") }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = Hairline)
+        Spacer(modifier = Modifier.height(12.dp))
+        CoursePeriodScheduleEditor(
+            schedule = periodSchedule,
+            onScheduleChange = onPeriodScheduleChange,
+        )
+
         if (icsSubscriptionUrl.isNotBlank()) {
             Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(color = Hairline)
@@ -762,6 +789,7 @@ private fun CourseGrid(
     courses: List<CourseItem>,
     weekDates: List<LocalDate>,
     today: LocalDate,
+    periodSchedule: com.mydailylife.schedule.data.CoursePeriodSchedule,
     slotHeight: Dp,
     draftSlots: List<DraftSlot>,
     liveDraft: DraftSlot?,
@@ -773,7 +801,10 @@ private fun CourseGrid(
 ) {
     val todayIndex = weekDates.indexOfFirst { it == today }
     val density = LocalDensity.current
-    val slotCount = CourseGridDefaults.slotCount
+    val periods = periodSchedule.periods
+    val slotCount = periodSchedule.slotCount
+    val lunchAfter = periodSchedule.lunchBreakAfterSlot()
+    val eveningAfter = periodSchedule.eveningBreakAfterSlot()
     val breakBand = BreakBandHeight
     val gridHeight = slotHeight * slotCount + breakBand * 2
     val slotHeightPx = with(density) { slotHeight.toPx() }
@@ -782,15 +813,15 @@ private fun CourseGrid(
 
     fun topOffset(startSlot: Int): Dp {
         var extra = 0.dp
-        if (startSlot > 4) extra += breakBand
-        if (startSlot > 9) extra += breakBand
+        if (startSlot > lunchAfter) extra += breakBand
+        if (startSlot > eveningAfter) extra += breakBand
         return slotHeight * (startSlot - 1) + extra
     }
 
     fun blockHeight(startSlot: Int, endSlot: Int): Dp {
         var extra = 0.dp
-        if (startSlot <= 4 && endSlot > 4) extra += breakBand
-        if (startSlot <= 9 && endSlot > 9) extra += breakBand
+        if (startSlot <= lunchAfter && endSlot > lunchAfter) extra += breakBand
+        if (startSlot <= eveningAfter && endSlot > eveningAfter) extra += breakBand
         return slotHeight * (endSlot - startSlot + 1) + extra
     }
 
@@ -800,7 +831,7 @@ private fun CourseGrid(
             val bottom = cursor + slotHeightPx
             if (y <= bottom || slot == slotCount) return slot
             cursor = bottom
-            if (slot == 4 || slot == 9) cursor += breakPx
+            if (slot == lunchAfter || slot == eveningAfter) cursor += breakPx
         }
         return slotCount
     }
@@ -829,8 +860,9 @@ private fun CourseGrid(
             .height(gridHeight),
     ) {
         Column {
-            CourseGridDefaults.timeSlots.forEachIndexed { index, time ->
-                val isBreakAfter = index == 3 || index == 8
+            periods.forEachIndexed { index, period ->
+                val slot = index + 1
+                val isBreakAfter = slot == lunchAfter || slot == eveningAfter
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -838,7 +870,7 @@ private fun CourseGrid(
                     verticalAlignment = Alignment.Top,
                 ) {
                     Text(
-                        text = time,
+                        text = "${period.start}\n${period.end}",
                         modifier = Modifier
                             .width(TimeGutterWidth)
                             .padding(top = 1.dp, end = 2.dp),
@@ -847,7 +879,7 @@ private fun CourseGrid(
                             lineHeight = 11.sp,
                         ),
                         color = Muted,
-                        maxLines = 1,
+                        maxLines = 2,
                         softWrap = false,
                         overflow = TextOverflow.Clip,
                         textAlign = TextAlign.End,

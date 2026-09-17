@@ -24,10 +24,18 @@ data class AcademicSchool(
 
 object AcademicSchoolIds {
     const val CQU = "cqu"
+    const val BNU = "bnu"
 }
 
 object AcademicSchools {
     val all: List<AcademicSchool> = listOf(
+        AcademicSchool(
+            id = AcademicSchoolIds.BNU,
+            name = "北京师范大学",
+            pinyin = "beijingshifandaxue",
+            initialLetter = 'B',
+            subtitle = "VPN 统一认证 onevpn.bnu.edu.cn",
+        ),
         AcademicSchool(
             id = AcademicSchoolIds.CQU,
             name = "重庆大学",

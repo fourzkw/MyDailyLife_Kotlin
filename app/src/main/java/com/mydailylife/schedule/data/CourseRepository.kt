@@ -56,6 +56,7 @@ class CourseRepository(context: Context) {
                     courses = items,
                     termStartDate = term,
                     maxTeachingWeek = inferredMax.coerceIn(1, 30),
+                    periodSchedule = _store.value.periodSchedule,
                 ),
             )
         }
@@ -68,10 +69,22 @@ class CourseRepository(context: Context) {
         }
     }
 
+    suspend fun setPeriodSchedule(schedule: CoursePeriodSchedule) {
+        ensureLoaded()
+        mutex.withLock {
+            persistLocked(_store.value.copy(periodSchedule = schedule))
+        }
+    }
+
     suspend fun clearAll() {
         ensureLoaded()
         mutex.withLock {
-            persistLocked(CourseStore(termStartDate = _store.value.termStartDate))
+            persistLocked(
+                CourseStore(
+                    termStartDate = _store.value.termStartDate,
+                    periodSchedule = _store.value.periodSchedule,
+                ),
+            )
         }
     }
 

@@ -29,22 +29,36 @@ object AcademicTimetableParser {
         if (text.isBlank() || text == "null") {
             error("未捕获到页面数据，请确认已打开课表并展开课程后再试")
         }
-        val root = runCatching { json.parseToJsonElement(text) }.getOrElse {
-            error("捕获结果不是有效 JSON")
-        }
         val collected = linkedMapOf<String, CourseItem>()
         var hint = "unknown"
 
-        if (root is JsonObject) {
+        val root = runCatching { json.parseToJsonElement(text) }.getOrNull()
+        if (root == null) {
+            if (BnuTimetableHtmlParser.looksLikeBnuTimetable(text)) {
+                BnuTimetableHtmlParser.parse(text).forEach { course ->
+                    collected.putIfAbsent(dedupeKey(course), course)
+                }
+                hint = "bnu-html"
+            } else {
+                error("捕获结果不是有效 JSON")
+            }
+        } else if (root is JsonObject) {
+            val pageHtml = root.stringProp("pageHtml")
+            if (!pageHtml.isNullOrBlank() && BnuTimetableHtmlParser.looksLikeBnuTimetable(pageHtml)) {
+                BnuTimetableHtmlParser.parse(pageHtml).forEach { course ->
+                    collected.putIfAbsent(dedupeKey(course), course)
+                }
+                if (collected.isNotEmpty()) hint = "bnu-html"
+            }
             val network = root["network"] as? JsonArray
             network?.forEach { entry ->
                 val obj = entry as? JsonObject ?: return@forEach
                 val body = obj.stringProp("body") ?: return@forEach
-                val fromBody = parseJsonBlob(body)
+                val fromBody = parseBody(body)
                 fromBody.forEach { course ->
                     collected.putIfAbsent(dedupeKey(course), course)
                 }
-                if (fromBody.isNotEmpty()) hint = "network"
+                if (fromBody.isNotEmpty() && hint == "unknown") hint = "network"
             }
             val dom = root["domCourses"] as? JsonArray
             if (dom != null) {
@@ -54,10 +68,10 @@ object AcademicTimetableParser {
                 if (hint == "unknown" && collected.isNotEmpty()) hint = "dom"
             }
             if (collected.isEmpty()) {
-                parseJsonBlob(text).forEach { course ->
+                parseBody(text).forEach { course ->
                     collected.putIfAbsent(dedupeKey(course), course)
                 }
-                if (collected.isNotEmpty()) hint = "cqu-root"
+                if (collected.isNotEmpty()) hint = "root"
             }
         } else if (root is JsonArray) {
             parseCourseArray(root).forEach { course ->
@@ -73,6 +87,15 @@ object AcademicTimetableParser {
             error("未能识别课表字段。请打开课表页、展开课程后重试；若仍失败，把课表接口样例发给开发者适配")
         }
         return AcademicCaptureResult(courses = courses, sourceHint = hint)
+    }
+
+    /** JSON timetable APIs or BNU HTML page body. */
+    fun parseBody(body: String): List<CourseItem> {
+        if (BnuTimetableHtmlParser.looksLikeBnuTimetable(body)) {
+            val htmlCourses = BnuTimetableHtmlParser.parse(body)
+            if (htmlCourses.isNotEmpty()) return htmlCourses
+        }
+        return parseJsonBlob(body)
     }
 
     /** Directly parse a buffered network response body (e.g. my-table-detail). */
@@ -153,7 +176,14 @@ object AcademicTimetableParser {
         if (start !in 1..MAX_SLOT) return null
         val endSlot = end.coerceIn(start, MAX_SLOT)
 
-        val weekLabel = firstString(obj, "teachingWeekFormat").orEmpty()
+        val weekLabel = firstString(
+            obj,
+            "teachingWeekFormat", "周次", "教学周", "周", "weeks", "zcs",
+        ).orEmpty().ifBlank {
+            extractWeekLabelFromText(
+                firstString(obj, "rawText", "classTime", "sksj", "timeText").orEmpty(),
+            )
+        }
         val weeksFromBits = CourseItem.weeksFromBitmask(firstString(obj, "teachingWeek"))
         val weeks = weeksFromBits.ifEmpty {
             parseTeachingWeekFormat(weekLabel)
@@ -178,22 +208,48 @@ object AcademicTimetableParser {
         )
     }
 
-    /** Parse labels like "10", "1-2", "6,11", "1-2,5,8-9". */
+    /** Parse labels like "10", "1-2", "6,11", "1-2,5,8-9", "1-16周". */
     fun parseTeachingWeekFormat(label: String?): List<Int> {
         if (label.isNullOrBlank()) return emptyList()
+        val oddOnly = label.contains("单周")
+        val evenOnly = label.contains("双周")
+        val normalized = label
+            .replace("周", ",")
+            .replace("星期", "")
+            .replace("单", "")
+            .replace("双", "")
+            .replace("～", "-")
+            .replace("~", "-")
+            .replace("—", "-")
         val weeks = linkedSetOf<Int>()
-        label.split(',', '，', ';', '；').map { it.trim() }.filter { it.isNotEmpty() }.forEach { part ->
-            val range = part.replace("～", "-").replace("~", "-").replace("—", "-")
-            val m = Regex("""(\d+)\s*-\s*(\d+)""").matchEntire(range)
-            if (m != null) {
-                val a = m.groupValues[1].toInt()
-                val b = m.groupValues[2].toInt()
-                for (w in minOf(a, b)..maxOf(a, b)) weeks += w
-            } else {
-                range.toIntOrNull()?.let { weeks += it }
+        normalized.split(',', '，', ';', '；', '、')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .forEach { part ->
+                val m = Regex("""(\d+)\s*-\s*(\d+)""").find(part)
+                if (m != null) {
+                    val a = m.groupValues[1].toInt()
+                    val b = m.groupValues[2].toInt()
+                    for (w in minOf(a, b)..maxOf(a, b)) {
+                        if (oddOnly && w % 2 == 0) continue
+                        if (evenOnly && w % 2 != 0) continue
+                        weeks += w
+                    }
+                } else {
+                    Regex("""\d+""").find(part)?.value?.toIntOrNull()?.let { w ->
+                        if (oddOnly && w % 2 == 0) return@forEach
+                        if (evenOnly && w % 2 != 0) return@forEach
+                        weeks += w
+                    }
+                }
             }
-        }
         return weeks.sorted()
+    }
+
+    fun extractWeekLabelFromText(text: String): String {
+        if (text.isBlank()) return ""
+        Regex("""(\d+\s*[-～~—到至,，、\d]*\s*周|单周|双周)""").find(text)?.value?.let { return it.trim() }
+        return ""
     }
 
     /** "王冰-33036[主讲];范正妍-31105[辅讲];" → "王冰、范正妍" */

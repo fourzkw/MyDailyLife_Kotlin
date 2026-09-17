@@ -3,7 +3,7 @@
 日程 + 课表 + 统计的 Android 日常工具，使用 **Kotlin / Jetpack Compose / Material3** 实现。  
 由 UniApp 版思路重写；界面配色见根目录 [`DESIGN.md`](DESIGN.md)（柔和珊瑚浅色风格）。
 
-**当前版本：`1.10.2`（`versionCode` 18）**
+**当前版本：`1.12.0`（`versionCode` 22）**
 
 面向协作者与 AI 的工程约定见 [`AGENTS.md`](AGENTS.md)。
 
@@ -14,72 +14,31 @@
 | 模块 | 能力 |
 |------|------|
 | **日程** | 周条 / 下拉月历、待办与已完成、课程同步显示、综合 / 时间 / 紧急度排序、Once·Daily·Weekly 提醒 |
-| **课表** | 教学周滑动、长按选格加课、详情编辑与删除、清空课表、Excel·CSV·xlsx / ICS 订阅 / 教务选校导入 |
+| **课表** | 教学周滑动、长按选格加课、详情编辑与删除、清空课表、Excel·CSV·xlsx / ICS 订阅 / 教务选校导入、上课时间预设与手动调整 |
 | **统计** | 聚合概览 |
 | **设置** | 通知权限与精确闹钟引导、默认优先级、标签、应用内检查更新 |
 
 ---
 
-## 环境与构建
-
-- **JDK 21**（Windows 上请确认 `JAVA_HOME`）
-- Android Studio 或命令行 Gradle
-- `minSdk` 26 / `targetSdk` 36
-
-```powershell
-# Debug
-.\gradlew.bat :app:assembleDebug
-
-# Release（需本地签名，见下）
-.\gradlew.bat :app:assembleRelease
-```
-
-产物路径：
-
-- Debug：`app/build/outputs/apk/debug/app-debug.apk`
-- Release：`app/build/outputs/apk/release/app-release.apk`
-
-### Release 签名（本地，勿提交）
-
-1. 生成本地 keystore（只做一次，妥善备份）。
-2. 在仓库根目录创建 **`keystore.properties`**（已在 `.gitignore`）：
-
-```properties
-storeFile=D:/keys/mydailylife-release.jks
-storePassword=你的密码
-keyAlias=mdl
-keyPassword=你的密码
-```
-
-无该文件仍可编 Debug；Release 与覆盖安装 / 自更新需要签名一致。
-
----
-
-## 应用内更新
-
-清单文件：[`update/version.json`](update/version.json)  
-公开读取示例：
-
-```text
-https://raw.githubusercontent.com/fourzkw/MyDailyLife_Kotlin/master/update/version.json
-```
-
-发版时建议按序：
-
-1. 递增 `app/build.gradle.kts` 的 `versionCode` / `versionName`
-2. 在下方 **版本更新说明** 追加本版条目
-3. `assembleRelease`，将 APK 命名为 `MyDailyLife-x.y.z.apk`
-4. 创建 GitHub Release（如 `v1.10.2`）并上传 APK
-5. 更新 `update/version.json` 的 `versionCode`、`versionName`、`apkUrl`、`changelog` 后推送
-
-> 仓库名或用户名若不同，请同步改 `version.json`、构建里的 `UPDATE_MANIFEST_URL` 与本文链接。
-
----
-
 ## 版本更新说明
 
-发版或合并用户可见改动时，请在本节 **顶部** 追加条目（新 → 旧）。  
-应用内更新弹窗文案以 `update/version.json` 的 `changelog` 为准，可与本节对应版本摘要保持一致。
+发版或合并用户可见改动时，请在本节 **顶部** 追加条目（新 → 旧）。
+
+### 1.12.0（code 22）
+
+- 课表设置重构：上课时间支持北师大 / 重大默认作息，可逐节修改起止时间
+
+### 1.11.2（code 21）
+
+- 北师大：兼容 WebView 规范化后的课表 HTML；`xskcb` 页用 Cookie 回拉；弹窗导航拉回当前 WebView；引导对齐「电脑端→我的课表→检索」
+
+### 1.11.1（code 20）
+
+- 北师大教务：检索出课表后持续缓存 `#mytable`（Bridge），捕获时优先用缓冲 HTML
+
+### 1.11.0（code 19）
+
+- 教务导入新增北京师范大学（VPN CAS 登录 `onevpn.bnu.edu.cn`；解析 `wsxk.xskcb*.jsp` 的 `#mytable` 网格）
 
 ### 1.10.2（code 18）
 
@@ -113,7 +72,7 @@ https://raw.githubusercontent.com/fourzkw/MyDailyLife_Kotlin/master/update/versi
 
 ### 1.7.0（code 11）
 
-- 教务导入先经「选择学校」页（拼音首字母分组 + 搜索；当前接入重庆大学）
+- 教务导入先经「选择学校」页（拼音首字母分组 + 搜索；当前接入重庆大学、北京师范大学）
 - 学期「第 N 周」按含当月 1 号的日历周计算（如 2026 年九月第二周周一为 9 月 7 日）
 
 ### 1.6.0（code 10）
@@ -139,14 +98,6 @@ https://raw.githubusercontent.com/fourzkw/MyDailyLife_Kotlin/master/update/versi
 ### 1.0（code 1）
 
 - 初版：日程（周 / 月）、课表、统计与设置的 Compose 实现
-
----
-
-## 不要提交
-
-- `keystore.properties`、`*.jks` / `*.keystore`
-- `local.properties`、`*.apk`、构建产物、`.idea` 本地状态
-- 含个人课表的抓取文件（见 `.gitignore`）
 
 ---
 

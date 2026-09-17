@@ -26,7 +26,7 @@ object CourseScheduleBridge {
         date: LocalDate,
         zone: ZoneId = ZoneId.systemDefault(),
     ): List<ScheduleItem> =
-        coursesForDate(store, date).map { toScheduleItem(it, date, zone) }
+        coursesForDate(store, date).map { toScheduleItem(it, date, store.periodSchedule, zone) }
 
     fun occursOnDate(
         course: CourseItem,
@@ -43,10 +43,11 @@ object CourseScheduleBridge {
     fun toScheduleItem(
         course: CourseItem,
         date: LocalDate,
+        periodSchedule: CoursePeriodSchedule = CoursePeriodSchedule(),
         zone: ZoneId = ZoneId.systemDefault(),
     ): ScheduleItem {
-        val start = date.atTime(slotStartTime(course.startSlot))
-        val end = date.atTime(slotEndTime(course.endSlot))
+        val start = date.atTime(slotStartTime(course.startSlot, periodSchedule))
+        val end = date.atTime(slotEndTime(course.endSlot, periodSchedule))
         val desc = listOf(course.teacher, course.location)
             .filter { it.isNotBlank() }
             .joinToString(" · ")
@@ -65,14 +66,21 @@ object CourseScheduleBridge {
         )
     }
 
-    fun slotStartTime(slot: Int): LocalTime {
-        val label = CourseGridDefaults.timeSlots.getOrNull((slot - 1).coerceAtLeast(0))
+    fun slotStartTime(
+        slot: Int,
+        periodSchedule: CoursePeriodSchedule = CoursePeriodSchedule(),
+    ): LocalTime {
+        val period = periodSchedule.periods.getOrNull((slot - 1).coerceAtLeast(0))
             ?: return LocalTime.of(8, 30)
-        val parts = label.split(':')
-        return LocalTime.of(parts[0].toInt(), parts[1].toInt())
+        return period.startTime()
     }
 
-    /** Approximate class end: start of last period + 45 minutes. */
-    fun slotEndTime(endSlot: Int): LocalTime =
-        slotStartTime(endSlot).plusMinutes(45)
+    fun slotEndTime(
+        endSlot: Int,
+        periodSchedule: CoursePeriodSchedule = CoursePeriodSchedule(),
+    ): LocalTime {
+        val period = periodSchedule.periods.getOrNull((endSlot - 1).coerceAtLeast(0))
+            ?: return slotStartTime(endSlot, periodSchedule).plusMinutes(45)
+        return period.endTime()
+    }
 }

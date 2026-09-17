@@ -7,6 +7,7 @@ import com.mydailylife.schedule.data.CourseExcelImporter
 import com.mydailylife.schedule.data.CourseGridDefaults
 import com.mydailylife.schedule.data.CourseIcsImporter
 import com.mydailylife.schedule.data.CourseItem
+import com.mydailylife.schedule.data.CoursePeriodSchedule
 import com.mydailylife.schedule.data.CourseRepository
 import com.mydailylife.schedule.data.SettingsRepository
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ data class CoursesUiState(
     val maxTeachingWeek: Int = 25,
     val termStartDate: LocalDate? = null,
     val weekDates: List<LocalDate> = emptyList(),
+    val periodSchedule: CoursePeriodSchedule = CoursePeriodSchedule(),
     val message: String? = null,
     val importing: Boolean = false,
     val pendingImport: PendingCourseImport? = null,
@@ -74,6 +76,7 @@ class CoursesViewModel(
                 maxTeachingWeek = maxWeek,
                 termStartDate = termStart,
                 weekDates = dates,
+                periodSchedule = store.periodSchedule,
                 message = msg,
                 importing = busy,
                 pendingImport = pending,
@@ -118,6 +121,13 @@ class CoursesViewModel(
 
     fun applyDefaultTermStart() {
         setTermStartDate(CourseGridDefaults.defaultTermStart())
+    }
+
+    fun setPeriodSchedule(schedule: CoursePeriodSchedule) {
+        viewModelScope.launch {
+            repository.setPeriodSchedule(schedule)
+            message.value = "已更新上课时间"
+        }
     }
 
     private fun syncTeachingWeekToToday() {

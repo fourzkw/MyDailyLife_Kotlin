@@ -106,9 +106,9 @@ Also bump `versionCode` by **+1** whenever `versionName` changes.
 
 Settings 「版本」 reads `BuildConfig.VERSION_NAME` — never hardcode the string in UI.
 
-**Current:** `1.10.2` / `versionCode` 18 — 统一各页顶部高度（Tab SectionHeader + 全屏 MdlTopAppBar）。
+**Current:** `1.12.0` / `versionCode` 22 — 课表设置：北师大/重大上课时间预设与逐节调整。
 
-用户可见的版本更新说明维护在 `README.md` →「版本更新说明」；发版时同步更新该节与 `update/version.json` 的 `changelog`。
+用户可见的版本更新说明维护在 `README.md` →「版本更新说明」。
 
 ## Not done / optional later
 
