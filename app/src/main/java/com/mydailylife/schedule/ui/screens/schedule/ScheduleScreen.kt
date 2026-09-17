@@ -74,6 +74,7 @@ import com.mydailylife.schedule.ui.components.SectionHeader
 import com.mydailylife.schedule.ui.components.bidirectionalSwipe
 import com.mydailylife.schedule.ui.components.horizontalSwipe
 import com.mydailylife.schedule.ui.components.priorityColor
+import com.mydailylife.schedule.ui.components.showBriefSnackbar
 import com.mydailylife.schedule.ui.theme.Canvas
 import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Ink
@@ -130,7 +131,7 @@ fun ScheduleScreen(
 
     LaunchedEffect(uiState.message) {
         val msg = uiState.message ?: return@LaunchedEffect
-        snackbar.showSnackbar(msg)
+        snackbar.showBriefSnackbar(msg)
         viewModel.consumeMessage()
     }
 

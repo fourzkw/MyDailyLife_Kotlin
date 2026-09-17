@@ -31,6 +31,7 @@ import com.mydailylife.schedule.data.ScheduleItem
 import com.mydailylife.schedule.ui.components.DeleteScheduleDialog
 import com.mydailylife.schedule.ui.components.MdlTopAppBar
 import com.mydailylife.schedule.ui.components.ScheduleCard
+import com.mydailylife.schedule.ui.components.showBriefSnackbar
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.PriorityUrgent
 import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
@@ -56,7 +57,7 @@ fun CompletedScreen(
             onDeleteEntire = {
                 viewModel.delete(item.id)
                 pendingDelete = null
-                scope.launch { snackbar.showSnackbar("已删除") }
+                scope.launch { snackbar.showBriefSnackbar("已删除") }
             },
             onDismiss = { pendingDelete = null },
         )
@@ -74,7 +75,7 @@ fun CompletedScreen(
                     onClick = {
                         showClearConfirm = false
                         viewModel.clearCompleted()
-                        scope.launch { snackbar.showSnackbar("已清空完成事项") }
+                        scope.launch { snackbar.showBriefSnackbar("已清空完成事项") }
                     },
                 ) {
                     Text("清空", color = PriorityUrgent)
@@ -125,7 +126,7 @@ fun CompletedScreen(
                             onClick = { onEdit(item.id) },
                             onLongClick = {
                                 viewModel.toggleCompleted(item.id)
-                                scope.launch { snackbar.showSnackbar("已恢复为未完成") }
+                                scope.launch { snackbar.showBriefSnackbar("已恢复为未完成") }
                             },
                             onDeleteClick = { pendingDelete = item },
                         )

@@ -43,9 +43,11 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 app.scheduleRepository.ensureLoaded()
                 app.settingsRepository.ensureLoaded()
+                app.courseRepository.ensureLoaded()
                 app.reminderScheduler.rescheduleAll(
-                    app.scheduleRepository.schedules.value,
-                    app.settingsRepository.settings.value,
+                    items = app.scheduleRepository.schedules.value,
+                    settings = app.settingsRepository.settings.value,
+                    courseStore = app.courseRepository.store.value,
                 )
             } finally {
                 pending.finish()

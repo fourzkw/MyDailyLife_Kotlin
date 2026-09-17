@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,7 +30,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.mydailylife.schedule.data.CoursePeriod
-import com.mydailylife.schedule.data.CoursePeriodPresets
 import com.mydailylife.schedule.data.CoursePeriodSchedule
 import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
@@ -50,33 +48,11 @@ fun CoursePeriodScheduleEditor(
     var editingField by remember { mutableStateOf<PeriodField?>(null) }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Text("上课时间", style = MaterialTheme.typography.titleSmall, color = Ink)
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "可选学校默认作息，也可点某一节修改起止时间。",
+            text = "点某一节的起止时间即可修改。",
             style = MaterialTheme.typography.bodySmall,
             color = Muted,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            CoursePeriodPresets.selectable.forEach { id ->
-                FilterChip(
-                    selected = schedule.presetId == id,
-                    onClick = { onScheduleChange(schedule.applyPreset(id)) },
-                    label = { Text(CoursePeriodPresets.label(id)) },
-                )
-            }
-            if (schedule.presetId == CoursePeriodPresets.CUSTOM) {
-                FilterChip(
-                    selected = true,
-                    onClick = {},
-                    label = { Text("自定义") },
-                )
-            }
-        }
         Spacer(modifier = Modifier.height(8.dp))
         Column(
             modifier = Modifier

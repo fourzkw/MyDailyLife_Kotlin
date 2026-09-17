@@ -53,6 +53,12 @@ class SettingsRepository(context: Context) {
     suspend fun setReminderBeforeMinutes(minutes: Int) =
         update { it.copy(reminderBeforeMinutes = minutes) }
 
+    suspend fun setCourseRemindersEnabled(enabled: Boolean) =
+        update { it.copy(courseRemindersEnabled = enabled) }
+
+    suspend fun setCourseReminderBeforeMinutes(minutes: Int) =
+        update { it.copy(courseReminderBeforeMinutes = minutes) }
+
     suspend fun setDefaultPriority(priority: Priority) =
         update { it.copy(defaultPriority = priority.storageKey) }
 
@@ -61,6 +67,9 @@ class SettingsRepository(context: Context) {
 
     suspend fun setScheduleSortMode(mode: ScheduleSortMode) =
         update { it.copy(scheduleSortMode = mode.storageKey) }
+
+    suspend fun setCourseGridFontLevel(level: Int) =
+        update { it.copy(courseGridFontLevel = CourseGridFontScale.coerce(level)) }
 
     suspend fun addTag(tag: String) {
         val trimmed = tag.trim()

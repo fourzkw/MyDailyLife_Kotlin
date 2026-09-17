@@ -1,6 +1,7 @@
 package com.mydailylife.schedule.ui.screens.reminders
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,13 +15,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,19 +35,24 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mydailylife.schedule.data.AppSettings
-import com.mydailylife.schedule.reminder.ReminderTimes
 import com.mydailylife.schedule.reminder.UpcomingReminder
 import com.mydailylife.schedule.ui.components.MdlTopAppBar
 import com.mydailylife.schedule.ui.theme.Canvas
 import com.mydailylife.schedule.ui.theme.CardShape
+import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
+import com.mydailylife.schedule.ui.theme.Rausch
+import com.mydailylife.schedule.ui.theme.SurfaceCard
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private enum class RangePickTarget { Start, End }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +69,28 @@ fun ReminderManageScreen(
     }
     val dateFormatter = remember {
         DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINA)
+    }
+    val shortDateFormatter = remember {
+        DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
+    }
+    var pickTarget by remember { mutableStateOf<RangePickTarget?>(null) }
+
+    pickTarget?.let { target ->
+        val initial = when (target) {
+            RangePickTarget.Start -> uiState.rangeStart
+            RangePickTarget.End -> uiState.rangeEnd
+        }
+        ReminderDatePickerDialog(
+            initialDate = initial,
+            onDismiss = { pickTarget = null },
+            onConfirm = { date ->
+                when (target) {
+                    RangePickTarget.Start -> viewModel.setRangeStart(date)
+                    RangePickTarget.End -> viewModel.setRangeEnd(date)
+                }
+                pickTarget = null
+            },
+        )
     }
 
     Scaffold(
@@ -96,26 +130,6 @@ fun ReminderManageScreen(
                     )
                 }
             }
-            uiState.groups.isEmpty() -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(16.dp),
-                ) {
-                    Text(
-                        text = "暂无待发提醒",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Ink,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "为仅一次、每天或每周事项开启提醒，并设置开始/结束时间后会出现在这里。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Muted,
-                    )
-                }
-            }
             else -> {
                 LazyColumn(
                     modifier = Modifier
@@ -124,38 +138,173 @@ fun ReminderManageScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    item(key = "summary") {
-                        Text(
-                            text = "共 ${uiState.totalCount} 条 · 未来 ${ReminderTimes.MANAGE_LOOKAHEAD_DAYS} 天",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Muted,
-                            modifier = Modifier.padding(bottom = 4.dp),
+                    item(key = "range") {
+                        ReminderRangeBar(
+                            rangeStart = uiState.rangeStart,
+                            rangeEnd = uiState.rangeEnd,
+                            dayCount = uiState.rangeDayCount,
+                            totalCount = uiState.totalCount,
+                            shortDateFormatter = shortDateFormatter,
+                            onPickStart = { pickTarget = RangePickTarget.Start },
+                            onPickEnd = { pickTarget = RangePickTarget.End },
+                            onReset = { viewModel.resetRangeToDefault() },
                         )
                     }
-                    uiState.groups.forEach { group ->
-                        item(key = "day-${group.date}") {
-                            Text(
-                                text = formatDayLabel(group.date, today, dateFormatter),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Ink,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                            )
+                    if (uiState.groups.isEmpty()) {
+                        item(key = "empty") {
+                            Column(modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)) {
+                                Text(
+                                    text = "该范围内暂无待发提醒",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Ink,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "可调整上方起止日期，或为日程 / 课表开启提醒。",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Muted,
+                                )
+                            }
                         }
-                        items(
-                            items = group.entries,
-                            key = { "${it.scheduleId}-${it.kind.storageKey}-${it.dueMillis}" },
-                        ) { entry ->
-                            ReminderManageRow(
-                                entry = entry,
-                                zone = zone,
-                                timeFormatter = timeFormatter,
-                                onClick = { onOpenItem(entry.scheduleId) },
-                            )
+                    } else {
+                        uiState.groups.forEach { group ->
+                            item(key = "day-${group.date}") {
+                                Text(
+                                    text = formatDayLabel(group.date, today, dateFormatter),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Ink,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                                )
+                            }
+                            items(
+                                items = group.entries,
+                                key = { "${it.scheduleId}-${it.kind.storageKey}-${it.dueMillis}" },
+                            ) { entry ->
+                                ReminderManageRow(
+                                    entry = entry,
+                                    zone = zone,
+                                    timeFormatter = timeFormatter,
+                                    onClick = { onOpenItem(entry.scheduleId) },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReminderRangeBar(
+    rangeStart: LocalDate,
+    rangeEnd: LocalDate,
+    dayCount: Int,
+    totalCount: Int,
+    shortDateFormatter: DateTimeFormatter,
+    onPickStart: () -> Unit,
+    onPickEnd: () -> Unit,
+    onReset: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(CardShape)
+            .background(SurfaceCard)
+            .border(1.dp, Hairline, CardShape)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(
+            text = "展示范围",
+            style = MaterialTheme.typography.labelLarge,
+            color = Ink,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RangeDateChip(
+                label = "开始",
+                value = rangeStart.format(shortDateFormatter),
+                onClick = onPickStart,
+                modifier = Modifier.weight(1f),
+            )
+            Text("–", color = Muted)
+            RangeDateChip(
+                label = "结束",
+                value = rangeEnd.format(shortDateFormatter),
+                onClick = onPickEnd,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "共 $totalCount 条 · $dayCount 天",
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+            )
+            Text(
+                text = "恢复默认",
+                style = MaterialTheme.typography.labelMedium,
+                color = Rausch,
+                modifier = Modifier.clickable(onClick = onReset),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RangeDateChip(
+    label: String,
+    value: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(CardShape)
+            .background(SurfaceSoft)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Muted)
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(value, style = MaterialTheme.typography.titleSmall, color = Ink)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderDatePickerDialog(
+    initialDate: LocalDate,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDate) -> Unit,
+) {
+    val initialMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val millis = state.selectedDateMillis ?: return@TextButton
+                    val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                    onConfirm(date)
+                },
+            ) { Text("确定") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    ) {
+        DatePicker(state = state)
     }
 }
 
@@ -196,7 +345,7 @@ private fun ReminderManageRow(
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "${entry.kindLabel} ${dueTime.format(timeFormatter)} · 提前 $leadLabel · ${entry.timeMode.label}",
+            text = "${entry.kindLabel} ${dueTime.format(timeFormatter)} · 提前 $leadLabel · ${entry.tagLabel}",
             style = MaterialTheme.typography.bodySmall,
             color = Muted,
         )

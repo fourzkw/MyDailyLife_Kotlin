@@ -1,15 +1,18 @@
 ﻿package com.mydailylife.schedule.ui.screens.courses
 
+import android.Manifest
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +40,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -63,22 +68,30 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mydailylife.schedule.asMdlApp
 import com.mydailylife.schedule.data.AcademicSemester
+import com.mydailylife.schedule.data.AppSettings
 import com.mydailylife.schedule.data.CourseGridDefaults
+import com.mydailylife.schedule.data.CourseGridFontScale
 import com.mydailylife.schedule.data.CourseImportMethod
 import com.mydailylife.schedule.data.CourseItem
+import com.mydailylife.schedule.data.CoursePeriodSchedule
+import com.mydailylife.schedule.reminder.ReminderPermission
 import com.mydailylife.schedule.ui.components.PrimaryPillButton
 import com.mydailylife.schedule.ui.components.SectionHeader
 import com.mydailylife.schedule.ui.components.SettingsRow
 import com.mydailylife.schedule.ui.components.horizontalSwipe
+import com.mydailylife.schedule.ui.components.showBriefSnackbar
 import com.mydailylife.schedule.ui.theme.Body
 import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.HairlineSoft
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
+import com.mydailylife.schedule.ui.theme.OnPrimary
 import com.mydailylife.schedule.ui.theme.OnSoftPrimary
 import com.mydailylife.schedule.ui.theme.PriorityHigh
 import com.mydailylife.schedule.ui.theme.PriorityLow
@@ -92,23 +105,20 @@ import com.mydailylife.schedule.ui.theme.ScreenTopPadding
 import com.mydailylife.schedule.ui.theme.SurfaceCard
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import com.mydailylife.schedule.ui.theme.SurfaceStrong
+import java.io.File
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
 /** Narrow gutter so day columns get more width. */
 private val TimeGutterWidth = 34.dp
 private val SlotHeight = 42.dp
 private val BreakBandHeight = 4.dp
-private val TimeLabelSize = 7.sp
-private val BlockTitleSize = 10.sp
-private val BlockMetaSize = 9.sp
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -137,6 +147,7 @@ fun CoursesScreen(
     var icsInput by remember { mutableStateOf("") }
     var showExcelHint by remember { mutableStateOf(false) }
     var showCourseSettings by remember { mutableStateOf(false) }
+    var pendingEnableCourseReminder by remember { mutableStateOf(false) }
     var detailCourse by remember { mutableStateOf<CourseItem?>(null) }
     var draftSlots by remember { mutableStateOf<List<DraftSlot>>(emptyList()) }
     var liveDraft by remember { mutableStateOf<DraftSlot?>(null) }
@@ -147,6 +158,19 @@ fun CoursesScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (pendingEnableCourseReminder) {
+            pendingEnableCourseReminder = false
+            if (granted || ReminderPermission.hasNotificationPermission(context)) {
+                viewModel.setCourseRemindersEnabled(true)
+            } else {
+                scope.launch { snackbar.showBriefSnackbar("需要通知权限才能上课提醒") }
+            }
+        }
+    }
 
     LaunchedEffect(uiState.teachingWeek) {
         draftSlots = emptyList()
@@ -164,7 +188,7 @@ fun CoursesScreen(
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             }
             if (bytes == null) {
-                snackbar.showSnackbar("无法读取所选文件")
+                snackbar.showBriefSnackbar("无法读取所选文件")
             } else {
                 viewModel.importExcelBytes(name, bytes)
             }
@@ -181,7 +205,7 @@ fun CoursesScreen(
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             }
             if (bytes == null) {
-                snackbar.showSnackbar("无法读取所选文件")
+                snackbar.showBriefSnackbar("无法读取所选文件")
             } else {
                 showIcsDialog = false
                 viewModel.importIcsBytes(name, bytes)
@@ -191,7 +215,7 @@ fun CoursesScreen(
 
     LaunchedEffect(uiState.message) {
         val msg = uiState.message ?: return@LaunchedEffect
-        snackbar.showSnackbar(msg)
+        snackbar.showBriefSnackbar(msg)
         viewModel.consumeMessage()
     }
 
@@ -289,7 +313,7 @@ fun CoursesScreen(
                     "请使用表头：课程名、教师、地点、星期、开始节次、结束节次。\n" +
                         "星期可用 1–7 或 一…日；节次从 1 起。\n" +
                         "未填周次的课程视为每周都上。\n" +
-                        "支持直接选择 .xlsx 或 CSV（UTF-8）。",
+                        "支持直接选择 .xlsx、.xls 或 CSV（UTF-8）。",
                 )
             },
             confirmButton = {
@@ -450,6 +474,9 @@ fun CoursesScreen(
                 icsSubscriptionUrl = uiState.icsSubscriptionUrl,
                 importing = uiState.importing,
                 hasCourses = uiState.courses.isNotEmpty(),
+                courseRemindersEnabled = uiState.courseRemindersEnabled,
+                courseReminderBeforeMinutes = uiState.courseReminderBeforeMinutes,
+                courseGridFontLevel = uiState.courseGridFontLevel,
                 onSaveTermStart = {
                     viewModel.setTermStartDate(it)
                 },
@@ -457,6 +484,54 @@ fun CoursesScreen(
                     viewModel.applyDefaultTermStart()
                 },
                 onPeriodScheduleChange = { viewModel.setPeriodSchedule(it) },
+                onCourseGridFontLevelChange = { viewModel.setCourseGridFontLevel(it) },
+                onCourseRemindersEnabledChange = { enabled ->
+                    if (enabled) {
+                        when {
+                            ReminderPermission.hasNotificationPermission(context) -> {
+                                viewModel.setCourseRemindersEnabled(true)
+                            }
+                            ReminderPermission.needsNotificationPermission() -> {
+                                // Request handled below via launcher wired in sheet host.
+                                pendingEnableCourseReminder = true
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            else -> viewModel.setCourseRemindersEnabled(true)
+                        }
+                    } else {
+                        viewModel.setCourseRemindersEnabled(false)
+                    }
+                },
+                onCourseReminderMinutesChange = { viewModel.setCourseReminderBeforeMinutes(it) },
+                onExportIcs = {
+                    scope.launch {
+                        try {
+                            val content = withContext(Dispatchers.Default) {
+                                viewModel.exportIcsContent()
+                            }
+                            val dir = File(context.cacheDir, "exports").also { it.mkdirs() }
+                            val file = File(dir, "mydailylife-courses.ics")
+                            withContext(Dispatchers.IO) {
+                                file.writeText(content, Charsets.UTF_8)
+                            }
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file,
+                            )
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/calendar"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                putExtra(Intent.EXTRA_SUBJECT, "课表导出")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(send, "导出课表"))
+                            showCourseSettings = false
+                        } catch (e: Exception) {
+                            snackbar.showBriefSnackbar(e.message?.takeIf { it.isNotBlank() } ?: "导出失败")
+                        }
+                    }
+                },
                 onRefreshIcs = {
                     showCourseSettings = false
                     viewModel.refreshIcsSubscription()
@@ -535,6 +610,7 @@ fun CoursesScreen(
                         weekDates = weekDates,
                         today = today,
                         periodSchedule = uiState.periodSchedule,
+                        fontLevel = uiState.courseGridFontLevel,
                         slotHeight = SlotHeight,
                         draftSlots = draftSlots,
                         liveDraft = liveDraft,
@@ -578,103 +654,271 @@ private fun currentTeachingWeekHint(uiState: CoursesUiState): Int {
 @Composable
 private fun CourseSettingsSheet(
     termStartDate: LocalDate?,
-    periodSchedule: com.mydailylife.schedule.data.CoursePeriodSchedule,
+    periodSchedule: CoursePeriodSchedule,
     icsSubscriptionUrl: String,
     importing: Boolean,
     hasCourses: Boolean,
+    courseRemindersEnabled: Boolean,
+    courseReminderBeforeMinutes: Int,
+    courseGridFontLevel: Int,
     onSaveTermStart: (LocalDate) -> Unit,
     onApplyDefaultTermStart: () -> Unit,
-    onPeriodScheduleChange: (com.mydailylife.schedule.data.CoursePeriodSchedule) -> Unit,
+    onPeriodScheduleChange: (CoursePeriodSchedule) -> Unit,
+    onCourseGridFontLevelChange: (Int) -> Unit,
+    onCourseRemindersEnabledChange: (Boolean) -> Unit,
+    onCourseReminderMinutesChange: (Int) -> Unit,
+    onExportIcs: () -> Unit,
     onRefreshIcs: () -> Unit,
     onClearCourses: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val initial = termStartDate ?: CourseGridDefaults.defaultTermStart()
-    var draft by remember(termStartDate) {
-        mutableStateOf(CourseGridDefaults.asTermStartMonday(initial))
+    var panel by remember { mutableStateOf(CourseSettingsPanel.Main) }
+    var showLeadPicker by remember { mutableStateOf(false) }
+    val app = LocalContext.current.asMdlApp()
+    val termLabel = (termStartDate ?: CourseGridDefaults.defaultTermStart())
+        .format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA))
+    val periodLabel = remember(periodSchedule) {
+        val first = periodSchedule.periods.firstOrNull()?.start.orEmpty()
+        val last = periodSchedule.periods.lastOrNull()?.end.orEmpty()
+        when {
+            first.isNotBlank() && last.isNotBlank() ->
+                "${periodSchedule.slotCount}节 · $first–$last"
+            else -> "${periodSchedule.slotCount}节"
+        }
     }
-    val today = LocalDate.now()
-    val semesterLabel = when (CourseGridDefaults.inferredSemester(today)) {
-        AcademicSemester.Autumn -> "当前按秋季学期推算"
-        AcademicSemester.Spring -> "当前按春季学期推算"
+    val fontLevel = CourseGridFontScale.coerce(courseGridFontLevel)
+
+    if (showLeadPicker) {
+        AlertDialog(
+            onDismissRequest = { showLeadPicker = false },
+            title = { Text("上课前提醒") },
+            text = {
+                Column {
+                    AppSettings.ReminderMinuteOptions.forEach { minutes ->
+                        TextButton(
+                            onClick = {
+                                onCourseReminderMinutesChange(minutes)
+                                showLeadPicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = AppSettings.reminderLabel(minutes),
+                                color = if (minutes == courseReminderBeforeMinutes) Rausch else Ink,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLeadPicker = false }) { Text("取消") }
+            },
+        )
     }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
             .padding(bottom = 32.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("课表设置", style = MaterialTheme.typography.titleMedium, color = Ink)
-            TextButton(onClick = onDismiss) { Text("完成") }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "$semesterLabel。默认：秋=9月第二周周一，春=2月第二周周一。",
-            style = MaterialTheme.typography.bodySmall,
-            color = Muted,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text("学期起点", style = MaterialTheme.typography.titleSmall, color = Ink)
-        Spacer(modifier = Modifier.height(8.dp))
-        TermStartEditor(
-            selected = draft,
-            onSelect = { draft = it },
-            caption = "修改后左右滑的教学周会按新起点重新对齐。",
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            TextButton(onClick = {
-                onApplyDefaultTermStart()
-                draft = CourseGridDefaults.defaultTermStart()
-            }) { Text("恢复默认起点") }
-            TextButton(onClick = { onSaveTermStart(draft) }) { Text("保存起点") }
-        }
+        when (panel) {
+            CourseSettingsPanel.Main -> {
+                CourseSettingsHeader(
+                    title = "课表设置",
+                    onTrailing = onDismiss,
+                    trailingLabel = "完成",
+                )
+                Text(
+                    text = "常用项点进二级页调整；上课时间在导入教务时按学校自动套用。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                SettingsRow(
+                    title = "学期起点",
+                    subtitle = "对齐教学周滑动",
+                    trailingText = termLabel,
+                    onClick = { panel = CourseSettingsPanel.TermStart },
+                )
+                SettingsRow(
+                    title = "上课时间",
+                    subtitle = "逐节调整起止时间",
+                    trailingText = periodLabel,
+                    onClick = { panel = CourseSettingsPanel.PeriodTimes },
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("课表字体", style = MaterialTheme.typography.titleMedium, color = Ink)
+                        Text(
+                            text = CourseGridFontScale.label(fontLevel),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Muted,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Slider(
+                        value = fontLevel.toFloat(),
+                        onValueChange = { onCourseGridFontLevelChange(it.toInt()) },
+                        valueRange = CourseGridFontScale.MIN.toFloat()..CourseGridFontScale.MAX.toFloat(),
+                        steps = CourseGridFontScale.MAX - CourseGridFontScale.MIN - 1,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Rausch,
+                            activeTrackColor = Rausch,
+                            inactiveTrackColor = Hairline,
+                        ),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("更小", style = MaterialTheme.typography.labelSmall, color = Muted)
+                        Text("更大", style = MaterialTheme.typography.labelSmall, color = Muted)
+                    }
+                }
+                SettingsRow(
+                    title = "上课提醒",
+                    subtitle = when {
+                        !app.settingsRepository.settings.value.notificationsEnabled ->
+                            "请先在「设置」中启用通知"
+                        !courseRemindersEnabled -> "关闭后不会提醒即将开始的课程"
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                            !app.reminderScheduler.canScheduleExactAlarms() ->
+                            "已启用；精确闹钟未授权，提醒可能延迟"
+                        else -> "提前 ${AppSettings.reminderLabel(courseReminderBeforeMinutes)}"
+                    },
+                    checked = courseRemindersEnabled,
+                    onCheckedChange = onCourseRemindersEnabledChange,
+                )
+                if (courseRemindersEnabled) {
+                    SettingsRow(
+                        title = "提前提醒时间",
+                        subtitle = AppSettings.reminderLabel(courseReminderBeforeMinutes),
+                        onClick = { showLeadPicker = true },
+                    )
+                }
+                HorizontalDivider(color = Hairline, modifier = Modifier.padding(vertical = 4.dp))
+                SettingsRow(
+                    title = "导出课表（ICS）",
+                    subtitle = if (hasCourses) "分享到日历或其他应用" else "当前没有课程",
+                    onClick = if (hasCourses) onExportIcs else null,
+                )
+                if (icsSubscriptionUrl.isNotBlank()) {
+                    SettingsRow(
+                        title = "刷新 ICS 订阅",
+                        subtitle = icsSubscriptionUrl,
+                        onClick = if (!importing) onRefreshIcs else null,
+                        trailingText = if (importing) "刷新中…" else null,
+                    )
+                }
+                SettingsRow(
+                    title = "清空课表",
+                    subtitle = if (hasCourses) "删除全部课程" else "当前没有课程",
+                    onClick = if (hasCourses) onClearCourses else null,
+                )
+            }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider(color = Hairline)
-        Spacer(modifier = Modifier.height(12.dp))
-        CoursePeriodScheduleEditor(
-            schedule = periodSchedule,
-            onScheduleChange = onPeriodScheduleChange,
-        )
+            CourseSettingsPanel.TermStart -> {
+                val initial = termStartDate ?: CourseGridDefaults.defaultTermStart()
+                var draft by remember(termStartDate) {
+                    mutableStateOf(CourseGridDefaults.asTermStartMonday(initial))
+                }
+                val today = LocalDate.now()
+                val semesterLabel = when (CourseGridDefaults.inferredSemester(today)) {
+                    AcademicSemester.Autumn -> "当前按秋季学期推算"
+                    AcademicSemester.Spring -> "当前按春季学期推算"
+                }
+                CourseSettingsHeader(
+                    title = "学期起点",
+                    onBack = { panel = CourseSettingsPanel.Main },
+                )
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Text(
+                        text = "$semesterLabel。默认：秋=9月第二周周一，春=2月第二周周一。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    TermStartEditor(
+                        selected = draft,
+                        onSelect = { draft = it },
+                        caption = "修改后左右滑的教学周会按新起点重新对齐。",
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = {
+                            onApplyDefaultTermStart()
+                            draft = CourseGridDefaults.defaultTermStart()
+                        }) { Text("恢复默认") }
+                        TextButton(onClick = {
+                            onSaveTermStart(draft)
+                            panel = CourseSettingsPanel.Main
+                        }) { Text("保存") }
+                    }
+                }
+            }
 
-        if (icsSubscriptionUrl.isNotBlank()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = Hairline)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text("ICS 订阅", style = MaterialTheme.typography.titleSmall, color = Ink)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = icsSubscriptionUrl,
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            TextButton(
-                onClick = onRefreshIcs,
-                enabled = !importing,
-            ) { Text(if (importing) "刷新中…" else "刷新课表") }
+            CourseSettingsPanel.PeriodTimes -> {
+                CourseSettingsHeader(
+                    title = "上课时间",
+                    onBack = { panel = CourseSettingsPanel.Main },
+                )
+                CoursePeriodScheduleEditor(
+                    schedule = periodSchedule,
+                    onScheduleChange = onPeriodScheduleChange,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider(color = Hairline)
-        Spacer(modifier = Modifier.height(8.dp))
-        SettingsRow(
-            title = "清空课表",
-            subtitle = if (hasCourses) "删除全部课程" else "当前没有课程",
-            onClick = if (hasCourses) onClearCourses else null,
-        )
+    }
+}
+
+private enum class CourseSettingsPanel {
+    Main,
+    TermStart,
+    PeriodTimes,
+}
+
+@Composable
+private fun CourseSettingsHeader(
+    title: String,
+    onBack: (() -> Unit)? = null,
+    onTrailing: (() -> Unit)? = null,
+    trailingLabel: String = "完成",
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .padding(top = 4.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onBack != null) {
+                TextButton(onClick = onBack) { Text("返回") }
+            } else {
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(title, style = MaterialTheme.typography.titleMedium, color = Ink)
+        }
+        if (onTrailing != null) {
+            TextButton(onClick = onTrailing) { Text(trailingLabel) }
+        } else {
+            Spacer(modifier = Modifier.width(8.dp))
+        }
     }
 }
 
@@ -790,6 +1034,7 @@ private fun CourseGrid(
     weekDates: List<LocalDate>,
     today: LocalDate,
     periodSchedule: com.mydailylife.schedule.data.CoursePeriodSchedule,
+    fontLevel: Int,
     slotHeight: Dp,
     draftSlots: List<DraftSlot>,
     liveDraft: DraftSlot?,
@@ -799,6 +1044,7 @@ private fun CourseGrid(
     onDraftRemove: (DraftSlot) -> Unit,
     onCourseClick: (CourseItem) -> Unit,
 ) {
+    val font = remember(fontLevel) { CourseGridFontScale.sizes(fontLevel) }
     val todayIndex = weekDates.indexOfFirst { it == today }
     val density = LocalDensity.current
     val periods = periodSchedule.periods
@@ -875,8 +1121,8 @@ private fun CourseGrid(
                             .width(TimeGutterWidth)
                             .padding(top = 1.dp, end = 2.dp),
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = TimeLabelSize,
-                            lineHeight = 11.sp,
+                            fontSize = font.timeSp.sp,
+                            lineHeight = font.timeLineSp.sp,
                         ),
                         color = Muted,
                         maxLines = 2,
@@ -1036,8 +1282,8 @@ private fun CourseGrid(
                         Text(
                             text = course.title,
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = BlockTitleSize,
-                                lineHeight = 12.sp,
+                                fontSize = font.titleSp.sp,
+                                lineHeight = font.titleLineSp.sp,
                             ),
                             color = Ink,
                             fontWeight = FontWeight.SemiBold,
@@ -1048,8 +1294,8 @@ private fun CourseGrid(
                             Text(
                                 text = course.teacher,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = BlockMetaSize,
-                                    lineHeight = 11.sp,
+                                    fontSize = font.metaSp.sp,
+                                    lineHeight = font.metaLineSp.sp,
                                 ),
                                 color = Body,
                                 maxLines = 1,
@@ -1060,8 +1306,8 @@ private fun CourseGrid(
                             Text(
                                 text = course.location,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = BlockMetaSize,
-                                    lineHeight = 11.sp,
+                                    fontSize = font.metaSp.sp,
+                                    lineHeight = font.metaLineSp.sp,
                                 ),
                                 color = Muted,
                                 maxLines = 1,

@@ -50,6 +50,7 @@ import com.mydailylife.schedule.ui.components.PrimaryPillButton
 import com.mydailylife.schedule.ui.components.ScheduleCard
 import com.mydailylife.schedule.ui.components.SectionHeader
 import com.mydailylife.schedule.ui.components.priorityColor
+import com.mydailylife.schedule.ui.components.showBriefSnackbar
 import com.mydailylife.schedule.ui.theme.Canvas
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
@@ -88,7 +89,7 @@ fun CalendarScreen(
                 {
                     viewModel.deleteOccurrence(item.id, uiState.selectedDate)
                     pendingDelete = null
-                    scope.launch { snackbar.showSnackbar("已删除当天") }
+                    scope.launch { snackbar.showBriefSnackbar("已删除当天") }
                 }
             } else {
                 null
@@ -96,7 +97,7 @@ fun CalendarScreen(
             onDeleteEntire = {
                 viewModel.delete(item.id)
                 pendingDelete = null
-                scope.launch { snackbar.showSnackbar("已删除") }
+                scope.launch { snackbar.showBriefSnackbar("已删除") }
             },
             onDismiss = { pendingDelete = null },
         )
@@ -212,7 +213,7 @@ fun CalendarScreen(
                         onLongClick = {
                             viewModel.toggleCompleted(item.id)
                             scope.launch {
-                                snackbar.showSnackbar(
+                                snackbar.showBriefSnackbar(
                                     if (item.completed) "已恢复为未完成" else "已标记完成",
                                 )
                             }

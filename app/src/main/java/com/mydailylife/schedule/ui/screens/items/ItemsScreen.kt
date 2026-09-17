@@ -31,6 +31,7 @@ import com.mydailylife.schedule.ui.components.MdlFilterChips
 import com.mydailylife.schedule.ui.components.MdlSearchPill
 import com.mydailylife.schedule.ui.components.ScheduleCard
 import com.mydailylife.schedule.ui.components.SectionHeader
+import com.mydailylife.schedule.ui.components.showBriefSnackbar
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
 import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
@@ -50,7 +51,7 @@ fun ItemsScreen(
 
     LaunchedEffect(uiState.message) {
         val msg = uiState.message ?: return@LaunchedEffect
-        snackbar.showSnackbar(msg)
+        snackbar.showBriefSnackbar(msg)
         viewModel.consumeMessage()
     }
 

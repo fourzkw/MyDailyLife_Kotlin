@@ -21,12 +21,16 @@ data class UpcomingReminder(
     val dueMillis: Long,
     val triggerMillis: Long,
     val leadMinutes: Int,
+    /** Overrides [timeMode].label in the manage list (e.g. 「课表」). */
+    val listTag: String? = null,
 ) {
     val kindLabel: String
         get() = when (kind) {
             ReminderKind.Start -> "开始"
             ReminderKind.End -> "截止"
         }
+
+    val tagLabel: String get() = listTag ?: timeMode.label
 }
 
 /**
@@ -36,7 +40,9 @@ data class UpcomingReminder(
 object ReminderTimes {
     const val IMMEDIATE_DELAY_MS = 1_500L
     private const val MAX_LOOKAHEAD_DAYS = 400
-    /** Horizon for the notification-manage list. */
+    /** Default manage-list window: today … today+6 (7 calendar days). */
+    const val MANAGE_DEFAULT_RANGE_DAYS = 7
+    /** Legacy wide horizon constant (unused by manage UI). */
     const val MANAGE_LOOKAHEAD_DAYS = 60
 
     fun slots(
@@ -54,25 +60,27 @@ object ReminderTimes {
     }
 
     /**
-     * All upcoming reminder fires within [lookaheadDays], sorted by trigger time then due.
-     * Recurring items may contribute multiple rows (one per occurrence in the window).
+     * All upcoming reminder fires with trigger date in [[rangeStart], [rangeEnd]] (inclusive).
      */
     fun listUpcoming(
         items: List<ScheduleItem>,
         nowMillis: Long = System.currentTimeMillis(),
         zone: ZoneId = ZoneId.systemDefault(),
-        lookaheadDays: Int = MANAGE_LOOKAHEAD_DAYS,
+        rangeStart: LocalDate = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate(),
+        rangeEnd: LocalDate = rangeStart.plusDays((MANAGE_DEFAULT_RANGE_DAYS - 1).toLong()),
         alreadyFired: (String, ReminderKind, Long) -> Boolean = { _, _, _ -> false },
     ): List<UpcomingReminder> {
-        val horizon = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
-            .plusDays(lookaheadDays.toLong())
+        val start = minOf(rangeStart, rangeEnd)
+        val end = maxOf(rangeStart, rangeEnd)
+        // Max lead is 1 day — include dues slightly past [end] whose trigger may still fall in range.
+        val dueHorizon = end.plusDays(1)
         return items
             .asSequence()
             .filter { !it.completed && it.reminderEnabled }
             .filter { it.timeModeEnum != ScheduleTimeMode.Unlimited }
             .flatMap { item ->
                 ReminderKind.entries.asSequence().flatMap { kind ->
-                    duesInWindow(item, kind, nowMillis, horizon, zone)
+                    duesInWindow(item, kind, nowMillis, dueHorizon, zone)
                         .filterNot { due -> alreadyFired(item.id, kind, due) }
                         .mapNotNull { due ->
                             val trigger = computeTriggerMillis(
@@ -80,6 +88,10 @@ object ReminderTimes {
                                 leadMinutes = item.reminderBeforeMinutes,
                                 nowMillis = nowMillis,
                             ) ?: return@mapNotNull null
+                            val triggerDate = Instant.ofEpochMilli(trigger).atZone(zone).toLocalDate()
+                            if (triggerDate.isBefore(start) || triggerDate.isAfter(end)) {
+                                return@mapNotNull null
+                            }
                             UpcomingReminder(
                                 scheduleId = item.id,
                                 title = item.title,

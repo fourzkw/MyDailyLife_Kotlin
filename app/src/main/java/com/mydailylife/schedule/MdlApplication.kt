@@ -39,13 +39,15 @@ class MdlApplication : Application() {
         appScope.launch {
             scheduleRepository.ensureLoaded()
             settingsRepository.ensureLoaded()
+            courseRepository.ensureLoaded()
             combine(
                 scheduleRepository.schedules,
                 settingsRepository.settings,
-            ) { items, settings ->
-                items to settings
-            }.collect { (items, settings) ->
-                reminderScheduler.rescheduleAll(items, settings)
+                courseRepository.store,
+            ) { items, settings, courses ->
+                Triple(items, settings, courses)
+            }.collect { (items, settings, courses) ->
+                reminderScheduler.rescheduleAll(items, settings, courses)
             }
         }
     }

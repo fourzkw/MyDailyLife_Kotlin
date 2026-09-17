@@ -106,19 +106,19 @@ Also bump `versionCode` by **+1** whenever `versionName` changes.
 
 Settings 「版本」 reads `BuildConfig.VERSION_NAME` — never hardcode the string in UI.
 
-**Current:** `1.12.0` / `versionCode` 22 — 课表设置：北师大/重大上课时间预设与逐节调整。
+**Current:** `1.13.5` / `versionCode` 28 — 通知管理日期范围可调（默认 7 天）。
 
 用户可见的版本更新说明维护在 `README.md` →「版本更新说明」。
 
 ## Not done / optional later
 
-ICS course **export**, Excel `.xls`（旧二进制）解析,
-上课提醒.
+更多教务学校接入.
 
 **Courses:** grid + `CourseStore` (`courses.json`); teaching week swipe filters
 `teachingWeeks`; tap block for detail/edit/delete; long-press drag to add;
-import Excel/CSV/xlsx / 教务选校再 WebView / ICS 订阅;
-term start editable (default autumn = Sept week-2 Monday, spring = Feb week-2 Monday).
+import Excel/CSV/xlsx/xls / 教务选校再 WebView / ICS 订阅与导出;
+term start editable (default autumn = Sept week-2 Monday, spring = Feb week-2 Monday);
+上课提醒 via AlarmManager + `courseRemindersEnabled`.
 
 **Reminders:** `ReminderScheduler` + `AlarmManager` for Once / Daily / Weekly;
 start and end can fire separately; per-item lead minutes on create.

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.mydailylife.schedule.data.CourseGridDefaults
 import com.mydailylife.schedule.data.CourseItem
+import com.mydailylife.schedule.data.CoursePeriodPresets
 import com.mydailylife.schedule.data.CourseRepository
 import com.mydailylife.schedule.data.academic.AcademicCaptureJs
 import com.mydailylife.schedule.data.academic.AcademicCaptureResult
@@ -51,6 +52,7 @@ import com.mydailylife.schedule.data.academic.AcademicTimetableParser
 import com.mydailylife.schedule.data.academic.BnuTimetableHtmlParser
 import com.mydailylife.schedule.ui.components.MdlTopAppBar
 import com.mydailylife.schedule.ui.components.PrimaryPillButton
+import com.mydailylife.schedule.ui.components.showBriefSnackbar
 import com.mydailylife.schedule.ui.theme.Canvas
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
@@ -179,7 +181,7 @@ fun AcademicImportScreen(
                 } else {
                     e.message ?: "捕获失败"
                 }
-                snackbar.showSnackbar(tip)
+                snackbar.showBriefSnackbar(tip)
             } finally {
                 capturing = false
             }
@@ -232,9 +234,10 @@ fun AcademicImportScreen(
                         items = courses,
                         termStartDate = termStart,
                         maxTeachingWeek = maxWeek,
+                        periodSchedule = CoursePeriodPresets.scheduleForSchoolId(schoolId),
                     )
                     pendingCourses = null
-                    snackbar.showSnackbar("已导入 ${courses.size} 条排课")
+                    snackbar.showBriefSnackbar("已导入 ${courses.size} 条排课")
                     onImported()
                 }
             },
@@ -298,7 +301,7 @@ fun AcademicImportScreen(
                 onClick = {
                     val wv = webViewRef.get()
                     if (wv == null) {
-                        scope.launch { snackbar.showSnackbar("页面尚未就绪") }
+                        scope.launch { snackbar.showBriefSnackbar("页面尚未就绪") }
                     } else {
                         runCapture(wv)
                     }

@@ -113,4 +113,21 @@ object CoursePeriodPresets {
     }
 
     val selectable: List<String> = listOf(BNU, CQU)
+
+    /** Default wall-clock schedule (重大). */
+    fun defaultSchedule(): CoursePeriodSchedule =
+        CoursePeriodSchedule(presetId = CQU, periods = cqu)
+
+    /**
+     * Map 教务学校 id（与 [com.mydailylife.schedule.data.academic.AcademicSchoolIds] 一致）
+     * to a period schedule; unknown → [defaultSchedule].
+     */
+    fun scheduleForSchoolId(schoolId: String?): CoursePeriodSchedule {
+        val id = schoolId?.trim()?.lowercase().orEmpty()
+        return when (id) {
+            BNU -> CoursePeriodSchedule(presetId = BNU, periods = bnu)
+            CQU -> CoursePeriodSchedule(presetId = CQU, periods = cqu)
+            else -> defaultSchedule()
+        }
+    }
 }

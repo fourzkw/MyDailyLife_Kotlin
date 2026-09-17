@@ -54,6 +54,7 @@ import com.mydailylife.schedule.data.Priority
 import com.mydailylife.schedule.reminder.ReminderPermission
 import com.mydailylife.schedule.ui.components.SectionHeader
 import com.mydailylife.schedule.ui.components.SettingsRow
+import com.mydailylife.schedule.ui.components.showBriefSnackbar
 import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
@@ -96,7 +97,7 @@ fun SettingsScreen(
             if (!app.reminderScheduler.canScheduleExactAlarms()) {
                 showExactAlarmDialog = true
             } else {
-                scope.launch { snackbar.showSnackbar("已开启通知提醒") }
+                scope.launch { snackbar.showBriefSnackbar("已开启通知提醒") }
             }
         } else {
             showOpenSettingsDialog = true
@@ -110,7 +111,7 @@ fun SettingsScreen(
                 if (!app.reminderScheduler.canScheduleExactAlarms()) {
                     showExactAlarmDialog = true
                 } else {
-                    scope.launch { snackbar.showSnackbar("已开启通知提醒") }
+                    scope.launch { snackbar.showBriefSnackbar("已开启通知提醒") }
                 }
             }
             ReminderPermission.needsNotificationPermission() -> {
@@ -127,7 +128,7 @@ fun SettingsScreen(
             enableNotifications()
         } else {
             viewModel.setNotificationsEnabled(false)
-            scope.launch { snackbar.showSnackbar("已关闭通知提醒") }
+            scope.launch { snackbar.showBriefSnackbar("已关闭通知提醒") }
         }
     }
 
@@ -428,13 +429,13 @@ fun SettingsScreen(
         }
         AppUpdateUiState.UpToDate -> {
             LaunchedEffect(update) {
-                snackbar.showSnackbar("已是最新版本")
+                snackbar.showBriefSnackbar("已是最新版本")
                 viewModel.dismissUpdateMessage()
             }
         }
         is AppUpdateUiState.Error -> {
             LaunchedEffect(update.message) {
-                snackbar.showSnackbar(update.message)
+                snackbar.showBriefSnackbar(update.message)
                 viewModel.dismissUpdateMessage()
             }
         }

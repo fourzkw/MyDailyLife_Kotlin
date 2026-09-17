@@ -82,7 +82,7 @@ enum class CourseImportMethod(
 ) {
     Excel(
         title = "Excel / CSV",
-        subtitle = "支持 .xlsx / CSV 表格导入",
+        subtitle = "支持 .xlsx / .xls / CSV 表格导入",
     ),
     Academic(
         title = "教务系统",

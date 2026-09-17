@@ -44,6 +44,7 @@ class CourseRepository(context: Context) {
         items: List<CourseItem>,
         termStartDate: LocalDate? = null,
         maxTeachingWeek: Int? = null,
+        periodSchedule: CoursePeriodSchedule? = null,
     ) {
         ensureLoaded()
         mutex.withLock {
@@ -56,7 +57,7 @@ class CourseRepository(context: Context) {
                     courses = items,
                     termStartDate = term,
                     maxTeachingWeek = inferredMax.coerceIn(1, 30),
-                    periodSchedule = _store.value.periodSchedule,
+                    periodSchedule = periodSchedule ?: _store.value.periodSchedule,
                 ),
             )
         }

@@ -3,7 +3,7 @@ package com.mydailylife.schedule.data
 import java.util.UUID
 
 /**
- * Parses course tables from CSV / TSV / `.xlsx`.
+ * Parses course tables from CSV / TSV / `.xlsx` / `.xls`.
  *
  * Expected header (order flexible; Chinese or English keys):
  * 课程名/title, 教师/teacher, 地点/location, 星期/weekday, 开始节次/start, 结束节次/end
@@ -22,8 +22,7 @@ object CourseExcelImporter {
         val lower = fileName.lowercase()
         return when {
             lower.endsWith(".xlsx") -> parseRows(CourseXlsxReader.readSheetRows(bytes))
-            lower.endsWith(".xls") ->
-                error("暂不支持旧版 .xls，请另存为 .xlsx 或 CSV（UTF-8）")
+            lower.endsWith(".xls") -> parseRows(CourseXlsReader.readSheetRows(bytes))
             else -> {
                 val text = decodeText(bytes)
                 parseCsv(text)
@@ -85,6 +84,8 @@ object CourseExcelImporter {
     }
 
     fun isXlsxName(name: String): Boolean = name.lowercase().endsWith(".xlsx")
+
+    fun isXlsName(name: String): Boolean = name.lowercase().endsWith(".xls")
 
     private fun decodeText(bytes: ByteArray): String {
         val utf8 = bytes.toString(Charsets.UTF_8)

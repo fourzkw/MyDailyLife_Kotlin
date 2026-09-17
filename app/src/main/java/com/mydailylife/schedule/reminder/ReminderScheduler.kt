@@ -8,11 +8,13 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.content.getSystemService
 import com.mydailylife.schedule.data.AppSettings
+import com.mydailylife.schedule.data.CourseScheduleBridge
+import com.mydailylife.schedule.data.CourseStore
 import com.mydailylife.schedule.data.ScheduleItem
 import java.time.ZoneId
 
 /**
- * Schedules start/end alarms for Once, Daily, and Weekly items.
+ * Schedules start/end alarms for Once, Daily, and Weekly items, plus optional 上课提醒.
  *
  * - If remaining time until due is greater than the lead window → fire at (due − lead).
  * - If remaining time is within the lead window (and due is still ahead) → fire ASAP once.
@@ -24,9 +26,13 @@ class ReminderScheduler(context: Context) {
     private val alarmManager = appContext.getSystemService<AlarmManager>()
     private val zone: ZoneId = ZoneId.systemDefault()
 
-    fun rescheduleAll(items: List<ScheduleItem>, settings: AppSettings) {
+    fun rescheduleAll(
+        items: List<ScheduleItem>,
+        settings: AppSettings,
+        courseStore: CourseStore = CourseStore(),
+    ) {
         cancelAllTracked()
-        pruneFiredFor(items)
+        pruneFiredFor(items, courseStore.courses.map { it.id }.toSet())
         if (!settings.notificationsEnabled) return
         val now = System.currentTimeMillis()
         val scheduled = linkedSetOf<String>()
@@ -41,6 +47,24 @@ class ReminderScheduler(context: Context) {
                 ) ?: return@forEach
                 if (schedule(item, slot, triggerAt, now)) {
                     scheduled += trackKey(item.id, slot.kind)
+                }
+            }
+        }
+        if (settings.courseRemindersEnabled && courseStore.courses.isNotEmpty()) {
+            CourseReminderTimes.nextSlots(
+                store = courseStore,
+                leadMinutes = settings.courseReminderBeforeMinutes,
+                nowMillis = now,
+                zone = zone,
+                alreadyFired = { id, due -> hasFired(id, ReminderKind.Start, due) },
+            ).forEach { courseSlot ->
+                val triggerAt = ReminderTimes.computeTriggerMillis(
+                    dueMillis = courseSlot.dueMillis,
+                    leadMinutes = courseSlot.leadMinutes,
+                    nowMillis = now,
+                ) ?: return@forEach
+                if (scheduleCourse(courseSlot, triggerAt, now)) {
+                    scheduled += trackKey(courseSlot.scheduleId, ReminderKind.Start)
                 }
             }
         }
@@ -112,6 +136,42 @@ class ReminderScheduler(context: Context) {
             body,
             create = true,
         ) ?: return false
+        return setAlarm(am, triggerAtMillis, nowMillis, pi)
+    }
+
+    private fun scheduleCourse(
+        slot: CourseReminderSlot,
+        triggerAtMillis: Long,
+        nowMillis: Long,
+    ): Boolean {
+        val am = alarmManager ?: return false
+        val remainingMs = (slot.dueMillis - nowMillis).coerceAtLeast(0L)
+        val leadMs = slot.leadMinutes.coerceAtLeast(0) * 60_000L
+        val body = when {
+            remainingMs <= 0L -> "${slot.title} 已到上课时间"
+            leadMs > 0L && remainingMs <= leadMs ->
+                "${slot.title} 将在 ${ReminderTimes.formatRemaining(remainingMs)}后开始"
+            slot.leadMinutes > 0 ->
+                "${slot.title} 将在 ${AppSettings.reminderLabel(slot.leadMinutes)}后开始"
+            else -> "${slot.title} 即将开始"
+        }
+        val pi = pendingIntent(
+            scheduleId = slot.scheduleId,
+            kind = ReminderKind.Start,
+            dueMillis = slot.dueMillis,
+            title = "上课提醒",
+            body = body,
+            create = true,
+        ) ?: return false
+        return setAlarm(am, triggerAtMillis, nowMillis, pi)
+    }
+
+    private fun setAlarm(
+        am: AlarmManager,
+        triggerAtMillis: Long,
+        nowMillis: Long,
+        pi: PendingIntent,
+    ): Boolean {
         val whenMs = triggerAtMillis.coerceAtLeast(nowMillis + ReminderTimes.IMMEDIATE_DELAY_MS)
         return runCatching {
             if (canScheduleExactAlarms()) {
@@ -157,7 +217,7 @@ class ReminderScheduler(context: Context) {
     private fun hasFired(scheduleId: String, kind: ReminderKind, dueMillis: Long): Boolean =
         prefs.getLong(firedKey(scheduleId, kind), 0L) == dueMillis
 
-    private fun pruneFiredFor(items: List<ScheduleItem>) {
+    private fun pruneFiredFor(items: List<ScheduleItem>, courseIds: Set<String>) {
         val alive = items.map { it.id }.toSet()
         val editor = prefs.edit()
         prefs.all.keys
@@ -165,7 +225,13 @@ class ReminderScheduler(context: Context) {
             .forEach { key ->
                 val rest = key.removePrefix(FIRED_PREFIX)
                 val id = rest.substringBeforeLast('_', missingDelimiterValue = rest)
-                if (id !in alive) editor.remove(key)
+                when {
+                    CourseScheduleBridge.isCourseItem(id) -> {
+                        val courseId = id.removePrefix(CourseScheduleBridge.ID_PREFIX)
+                        if (courseId !in courseIds) editor.remove(key)
+                    }
+                    id !in alive -> editor.remove(key)
+                }
             }
         editor.apply()
     }
@@ -187,7 +253,13 @@ class ReminderScheduler(context: Context) {
                 // Legacy single-id keys from Once-only scheduling.
                 return key to ReminderKind.End
             }
-            return parts[0] to ReminderKind.fromStorage(parts[1])
+            // trackKey is "id:kind" but course ids already contain ':' ("course:uuid").
+            val kindPart = key.substringAfterLast(':')
+            val idPart = key.substringBeforeLast(':')
+            if (idPart.isEmpty() || kindPart.isEmpty() || kindPart == key) {
+                return key to ReminderKind.End
+            }
+            return idPart to ReminderKind.fromStorage(kindPart)
         }
     }
 }

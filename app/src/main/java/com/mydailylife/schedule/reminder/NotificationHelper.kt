@@ -26,7 +26,7 @@ object NotificationHelper {
             CHANNEL_NAME,
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "事项开始/结束前提醒"
+            description = "事项与上课前提醒"
             enableVibration(true)
         }
         manager.createNotificationChannel(channel)

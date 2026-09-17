@@ -60,6 +60,7 @@ import com.mydailylife.schedule.ui.components.FormFieldShell
 import com.mydailylife.schedule.ui.components.MdlTopAppBar
 import com.mydailylife.schedule.ui.components.PrimaryPillButton
 import com.mydailylife.schedule.ui.components.SettingsRow
+import com.mydailylife.schedule.ui.components.showBriefSnackbar
 import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
@@ -125,7 +126,7 @@ fun CreateScreen(
     }
     LaunchedEffect(uiState.error) {
         val err = uiState.error ?: return@LaunchedEffect
-        snackbar.showSnackbar(err)
+        snackbar.showBriefSnackbar(err)
         viewModel.consumeError()
     }
 

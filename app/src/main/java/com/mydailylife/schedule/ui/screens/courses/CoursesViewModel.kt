@@ -3,10 +3,14 @@ package com.mydailylife.schedule.ui.screens.courses
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mydailylife.schedule.data.AppSettings
 import com.mydailylife.schedule.data.CourseExcelImporter
 import com.mydailylife.schedule.data.CourseGridDefaults
+import com.mydailylife.schedule.data.CourseIcsExporter
 import com.mydailylife.schedule.data.CourseIcsImporter
 import com.mydailylife.schedule.data.CourseItem
+import com.mydailylife.schedule.data.CourseGridFontScale
+import com.mydailylife.schedule.data.CoursePeriodPresets
 import com.mydailylife.schedule.data.CoursePeriodSchedule
 import com.mydailylife.schedule.data.CourseRepository
 import com.mydailylife.schedule.data.SettingsRepository
@@ -25,6 +29,8 @@ data class PendingCourseImport(
     val courses: List<CourseItem>,
     val sourceHint: String,
     val suggestedTermStart: LocalDate? = null,
+    /** Applied on confirm; null keeps existing store schedule. */
+    val suggestedPeriodSchedule: CoursePeriodSchedule? = CoursePeriodPresets.defaultSchedule(),
 )
 
 data class CoursesUiState(
@@ -40,6 +46,9 @@ data class CoursesUiState(
     val importing: Boolean = false,
     val pendingImport: PendingCourseImport? = null,
     val icsSubscriptionUrl: String = "",
+    val courseRemindersEnabled: Boolean = true,
+    val courseReminderBeforeMinutes: Int = 15,
+    val courseGridFontLevel: Int = CourseGridFontScale.DEFAULT,
 )
 
 class CoursesViewModel(
@@ -84,7 +93,12 @@ class CoursesViewModel(
         },
         settingsRepository.settings,
     ) { base, settings ->
-        base.copy(icsSubscriptionUrl = settings.courseIcsUrl)
+        base.copy(
+            icsSubscriptionUrl = settings.courseIcsUrl,
+            courseRemindersEnabled = settings.courseRemindersEnabled,
+            courseReminderBeforeMinutes = settings.courseReminderBeforeMinutes,
+            courseGridFontLevel = settings.courseGridFontLevelClamped,
+        )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -129,6 +143,30 @@ class CoursesViewModel(
             message.value = "已更新上课时间"
         }
     }
+
+    fun setCourseRemindersEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setCourseRemindersEnabled(enabled)
+            message.value = if (enabled) "已开启上课提醒" else "已关闭上课提醒"
+        }
+    }
+
+    fun setCourseReminderBeforeMinutes(minutes: Int) {
+        viewModelScope.launch {
+            settingsRepository.setCourseReminderBeforeMinutes(minutes)
+            message.value = "上课前提醒：${AppSettings.reminderLabel(minutes)}"
+        }
+    }
+
+    fun setCourseGridFontLevel(level: Int) {
+        viewModelScope.launch {
+            settingsRepository.setCourseGridFontLevel(level)
+        }
+    }
+
+    /** Builds ICS text for the current store; throws if empty. */
+    fun exportIcsContent(): String =
+        CourseIcsExporter.export(repository.store.value)
 
     private fun syncTeachingWeekToToday() {
         val store = repository.store.value
@@ -261,6 +299,7 @@ class CoursesViewModel(
                     items = pending.courses,
                     termStartDate = CourseGridDefaults.asTermStartMonday(termStart),
                     maxTeachingWeek = maxWeek,
+                    periodSchedule = pending.suggestedPeriodSchedule,
                 )
                 pendingImport.value = null
                 syncTeachingWeekToToday()

@@ -1,4 +1,4 @@
-﻿package com.mydailylife.schedule.ui.navigation
+package com.mydailylife.schedule.ui.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -22,6 +22,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.mydailylife.schedule.asMdlApp
+import com.mydailylife.schedule.data.CourseScheduleBridge
 import com.mydailylife.schedule.ui.screens.completed.CompletedScreen
 import com.mydailylife.schedule.ui.screens.completed.CompletedViewModel
 import com.mydailylife.schedule.ui.screens.courses.AcademicImportScreen
@@ -175,11 +176,20 @@ fun MdlNavHost(
                     factory = ReminderManageViewModel.factory(
                         scheduleRepository = repository,
                         settingsRepository = app.settingsRepository,
+                        courseRepository = app.courseRepository,
                     ),
                 )
                 ReminderManageScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenItem = { id -> navController.navigate(Routes.create(id)) },
+                    onOpenItem = { id ->
+                        if (CourseScheduleBridge.isCourseItem(id)) {
+                            navController.navigate(Routes.Courses) {
+                                launchSingleTop = true
+                            }
+                        } else {
+                            navController.navigate(Routes.create(id))
+                        }
+                    },
                     viewModel = vm,
                 )
             }
