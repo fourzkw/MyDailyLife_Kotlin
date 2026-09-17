@@ -80,15 +80,15 @@ enum class CourseImportMethod(
 ) {
     Excel(
         title = "Excel / CSV",
-        subtitle = "从表格文件导入（推荐另存为 CSV）",
+        subtitle = "支持 .xlsx / CSV 表格导入",
     ),
     Academic(
         title = "教务系统",
-        subtitle = "打开重庆大学智慧教务，登录后捕获课表",
+        subtitle = "选择学校后登录教务，捕获课表",
     ),
     Ics(
         title = "ICS 订阅",
-        subtitle = "粘贴订阅链接或日历文件（后续接入）",
+        subtitle = "粘贴订阅链接、ICS 内容或选择 .ics 文件",
     ),
 }
 
@@ -130,13 +130,13 @@ object CourseGridDefaults {
     }
 
     /**
-     * Monday of the [weekOfMonth]-th week in [month], where week 1 starts on the
-     * first Monday on or after the 1st of the month.
+     * Monday of the [weekOfMonth]-th calendar week of [month].
+     * Week 1 is the week that contains the 1st (Monday may fall in the previous month).
      */
     fun mondayOfMonthWeek(year: Int, month: Int, weekOfMonth: Int): LocalDate {
         val first = LocalDate.of(year, month, 1)
-        val firstMonday = first.with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
-        return firstMonday.plusWeeks((weekOfMonth.coerceAtLeast(1) - 1).toLong())
+        val week1Monday = first.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        return week1Monday.plusWeeks((weekOfMonth.coerceAtLeast(1) - 1).toLong())
     }
 
     fun termStartForSemester(semester: AcademicSemester, year: Int): LocalDate = when (semester) {

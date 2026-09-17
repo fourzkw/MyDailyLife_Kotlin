@@ -71,7 +71,69 @@ class CourseRepository(context: Context) {
     suspend fun clearAll() {
         ensureLoaded()
         mutex.withLock {
-            persistLocked(CourseStore())
+            persistLocked(CourseStore(termStartDate = _store.value.termStartDate))
+        }
+    }
+
+    suspend fun addCourse(course: CourseItem) {
+        ensureLoaded()
+        mutex.withLock {
+            val next = _store.value.courses + course
+            val maxWeek = next.flatMap { it.teachingWeeks }.maxOrNull()
+                ?.coerceAtLeast(_store.value.maxTeachingWeek)
+                ?: _store.value.maxTeachingWeek
+            persistLocked(
+                _store.value.copy(
+                    courses = next,
+                    maxTeachingWeek = maxWeek.coerceIn(1, 30),
+                ),
+            )
+        }
+    }
+
+    suspend fun updateCourse(course: CourseItem) {
+        ensureLoaded()
+        mutex.withLock {
+            val next = _store.value.courses.map { if (it.id == course.id) course else it }
+            persistLocked(_store.value.copy(courses = next))
+        }
+    }
+
+    suspend fun removeCourse(id: String) {
+        ensureLoaded()
+        mutex.withLock {
+            persistLocked(_store.value.copy(courses = _store.value.courses.filterNot { it.id == id }))
+        }
+    }
+
+    /**
+     * Remove only [week] from a course. If the course was "every week", expand to
+     * 1..[maxTeachingWeek] minus [week]. Deletes the course when no weeks remain.
+     */
+    suspend fun removeCourseOccurrence(id: String, week: Int) {
+        ensureLoaded()
+        mutex.withLock {
+            val current = _store.value
+            val course = current.courses.find { it.id == id } ?: return@withLock
+            val maxWeek = current.maxTeachingWeek.coerceAtLeast(1)
+            val remaining = when {
+                course.teachingWeeks.isEmpty() ->
+                    (1..maxWeek).filter { it != week }
+                else ->
+                    course.teachingWeeks.filter { it != week }
+            }
+            val nextCourses = if (remaining.isEmpty()) {
+                current.courses.filterNot { it.id == id }
+            } else {
+                current.courses.map {
+                    if (it.id != id) it
+                    else it.copy(
+                        teachingWeeks = remaining,
+                        teachingWeekLabel = CourseItem.formatWeekList(remaining),
+                    )
+                }
+            }
+            persistLocked(current.copy(courses = nextCourses))
         }
     }
 

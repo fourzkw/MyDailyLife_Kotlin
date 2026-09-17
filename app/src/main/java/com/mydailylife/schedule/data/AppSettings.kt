@@ -9,10 +9,14 @@ data class AppSettings(
     val reminderBeforeMinutes: Int = 15,
     val defaultPriority: String = Priority.Medium.storageKey,
     val presetTags: List<String> = DefaultPresetTags,
-    /** Placeholder until ICS auto-refresh is wired. */
-    val courseAutoUpdate: Boolean = false,
+    /** Last successful ICS subscription URL (empty if none). */
+    val courseIcsUrl: String = "",
+    /** 日程列表排序：综合 / 时间 / 紧急度. */
+    val scheduleSortMode: String = ScheduleSortMode.Comprehensive.storageKey,
 ) {
     val defaultPriorityEnum: Priority get() = Priority.fromStorage(defaultPriority)
+    val scheduleSortModeEnum: ScheduleSortMode
+        get() = ScheduleSortMode.fromStorage(scheduleSortMode)
 
     companion object {
         val DefaultPresetTags: List<String> =

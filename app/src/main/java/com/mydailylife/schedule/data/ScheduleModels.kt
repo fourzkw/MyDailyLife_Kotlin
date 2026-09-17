@@ -99,6 +99,23 @@ enum class DateFilter(val label: String) {
     Week("本周"),
 }
 
+/** How the 日程 day list is ordered. */
+enum class ScheduleSortMode(val storageKey: String, val label: String) {
+    Comprehensive("comprehensive", "综合"),
+    Time("time", "时间"),
+    Urgency("urgency", "紧急度");
+
+    companion object {
+        val Labels: List<String> = entries.map { it.label }
+
+        fun fromStorage(key: String): ScheduleSortMode =
+            entries.find { it.storageKey == key } ?: Comprehensive
+
+        fun fromLabel(label: String): ScheduleSortMode =
+            entries.find { it.label == label } ?: Comprehensive
+    }
+}
+
 val ItemsFilterChips = listOf(
     "全部",
     "今天",

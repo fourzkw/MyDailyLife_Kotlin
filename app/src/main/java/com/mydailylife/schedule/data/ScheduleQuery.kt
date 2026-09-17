@@ -41,15 +41,37 @@ object ScheduleQuery {
         return score
     }
 
-    fun sorted(items: List<ScheduleItem>): List<ScheduleItem> {
-        return items
-            .map { it to calculatePriorityScore(it) }
-            .sortedWith(
-                compareByDescending<Pair<ScheduleItem, Double>> { it.second }
-                    .thenBy { itemSortKey(it.first) }
-                    .thenByDescending { it.first.updatedAtMillis },
+    fun sorted(
+        items: List<ScheduleItem>,
+        mode: ScheduleSortMode = ScheduleSortMode.Comprehensive,
+    ): List<ScheduleItem> {
+        return when (mode) {
+            ScheduleSortMode.Comprehensive -> items
+                .map { it to calculatePriorityScore(it) }
+                .sortedWith(
+                    compareByDescending<Pair<ScheduleItem, Double>> { it.second }
+                        .thenBy { itemSortKey(it.first) }
+                        .thenByDescending { it.first.updatedAtMillis },
+                )
+                .map { it.first }
+            ScheduleSortMode.Time -> items.sortedWith(
+                compareBy<ScheduleItem> { itemSortKey(it) }
+                    .thenByDescending { priorityRank(it.priorityEnum) }
+                    .thenByDescending { it.updatedAtMillis },
             )
-            .map { it.first }
+            ScheduleSortMode.Urgency -> items.sortedWith(
+                compareByDescending<ScheduleItem> { priorityRank(it.priorityEnum) }
+                    .thenBy { itemSortKey(it) }
+                    .thenByDescending { it.updatedAtMillis },
+            )
+        }
+    }
+
+    private fun priorityRank(priority: Priority): Int = when (priority) {
+        Priority.Urgent -> 4
+        Priority.High -> 3
+        Priority.Medium -> 2
+        Priority.Low -> 1
     }
 
     private fun itemSortKey(item: ScheduleItem): Long {
@@ -64,10 +86,11 @@ object ScheduleQuery {
         items: List<ScheduleItem>,
         query: String,
         chip: String,
+        mode: ScheduleSortMode = ScheduleSortMode.Comprehensive,
     ): List<ScheduleItem> {
         val keyword = query.trim()
         val today = LocalDate.now(zone)
-        return sorted(items)
+        return sorted(items, mode)
             .filter { !it.completed }
             .filter { item ->
                 if (keyword.isEmpty()) true
@@ -79,8 +102,11 @@ object ScheduleQuery {
             .filter { item -> matchesChip(item, chip, today) }
     }
 
-    fun completed(items: List<ScheduleItem>): List<ScheduleItem> =
-        sorted(items).filter { it.completed }
+    fun completed(
+        items: List<ScheduleItem>,
+        mode: ScheduleSortMode = ScheduleSortMode.Comprehensive,
+    ): List<ScheduleItem> =
+        sorted(items, mode).filter { it.completed }
 
     fun occursOn(
         item: ScheduleItem,
@@ -101,8 +127,12 @@ object ScheduleQuery {
         }
     }
 
-    fun itemsForDate(items: List<ScheduleItem>, date: LocalDate): List<ScheduleItem> =
-        sorted(items.filter { occursOn(it, date) })
+    fun itemsForDate(
+        items: List<ScheduleItem>,
+        date: LocalDate,
+        mode: ScheduleSortMode = ScheduleSortMode.Comprehensive,
+    ): List<ScheduleItem> =
+        sorted(items.filter { occursOn(it, date) }, mode)
 
     fun dayPrioritiesInMonth(
         items: List<ScheduleItem>,

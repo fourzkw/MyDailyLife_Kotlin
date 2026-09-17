@@ -3,13 +3,12 @@ package com.mydailylife.schedule.data
 import java.util.UUID
 
 /**
- * Parses Excel-exported CSV for course import.
+ * Parses course tables from CSV / TSV / `.xlsx`.
  *
  * Expected header (order flexible; Chinese or English keys):
  * 课程名/title, 教师/teacher, 地点/location, 星期/weekday, 开始节次/start, 结束节次/end
  *
  * Weekday: 1–7 (Mon–Sun) or 一…日 / 周一…周日.
- * `.xlsx` is not parsed yet — save as CSV from Excel first.
  */
 object CourseExcelImporter {
     private val titleKeys = setOf("课程名", "课程", "名称", "title", "name", "course")
@@ -19,8 +18,22 @@ object CourseExcelImporter {
     private val startKeys = setOf("开始节次", "开始", "start", "startslot", "start_slot")
     private val endKeys = setOf("结束节次", "结束", "end", "endslot", "end_slot")
 
-    fun parseCsv(text: String): List<CourseItem> {
-        val rows = readCsvRows(text)
+    fun parseBytes(fileName: String, bytes: ByteArray): List<CourseItem> {
+        val lower = fileName.lowercase()
+        return when {
+            lower.endsWith(".xlsx") -> parseRows(CourseXlsxReader.readSheetRows(bytes))
+            lower.endsWith(".xls") ->
+                error("暂不支持旧版 .xls，请另存为 .xlsx 或 CSV（UTF-8）")
+            else -> {
+                val text = decodeText(bytes)
+                parseCsv(text)
+            }
+        }
+    }
+
+    fun parseCsv(text: String): List<CourseItem> = parseRows(readCsvRows(text))
+
+    fun parseRows(rows: List<List<String>>): List<CourseItem> {
         if (rows.isEmpty()) error("文件为空")
         val header = rows.first().map { normalizeHeader(it) }
         val titleIdx = indexOf(header, titleKeys) ?: error("缺少「课程名」列")
@@ -71,6 +84,20 @@ object CourseExcelImporter {
         return lower.endsWith(".csv") || lower.endsWith(".tsv")
     }
 
+    fun isXlsxName(name: String): Boolean = name.lowercase().endsWith(".xlsx")
+
+    private fun decodeText(bytes: ByteArray): String {
+        val utf8 = bytes.toString(Charsets.UTF_8)
+        // UTF-16 LE BOM
+        if (bytes.size >= 2 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte()) {
+            return bytes.toString(Charsets.UTF_16LE)
+        }
+        if (utf8.contains('\uFFFD') && bytes.any { it == 0.toByte() }) {
+            return runCatching { bytes.toString(Charsets.UTF_16LE) }.getOrDefault(utf8)
+        }
+        return utf8
+    }
+
     private fun indexOf(header: List<String>, keys: Set<String>): Int? {
         val normalizedKeys = keys.map { normalizeHeader(it) }.toSet()
         return header.indexOfFirst { it in normalizedKeys }.takeIf { it >= 0 }
@@ -86,7 +113,7 @@ object CourseExcelImporter {
     private fun parseWeekday(raw: String): Int? {
         val t = raw.trim()
         t.toIntOrNull()?.takeIf { it in 1..7 }?.let { return it }
-        val mapped = when (t.replace("周", "").replace("星期", "")) {
+        val mapped = when (t.replace("周", "").replace("星期", "").lowercase()) {
             "一", "1", "mon", "monday" -> 1
             "二", "2", "tue", "tuesday" -> 2
             "三", "3", "wed", "wednesday" -> 3

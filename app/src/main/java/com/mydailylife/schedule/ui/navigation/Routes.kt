@@ -16,12 +16,15 @@ object Routes {
     const val CreateWithId = "create/{scheduleId}"
     const val Completed = "completed"
     const val Reminders = "reminders"
-    const val AcademicImport = "courses/academic-import"
+    const val AcademicSchoolPicker = "courses/academic-schools"
+    const val AcademicImport = "courses/academic-import/{schoolId}"
 
     val tabs = listOf(Schedule, Courses, Statistics, Settings)
 
     fun create(scheduleId: String? = null): String =
         if (scheduleId.isNullOrBlank()) Create else "create/$scheduleId"
+
+    fun academicImport(schoolId: String): String = "courses/academic-import/$schoolId"
 }
 
 data class TabDestination(

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -58,11 +59,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mydailylife.schedule.data.CourseScheduleBridge
 import com.mydailylife.schedule.data.Priority
 import com.mydailylife.schedule.data.ScheduleItem
+import com.mydailylife.schedule.data.ScheduleSortMode
 import com.mydailylife.schedule.data.ScheduleTimeMode
 import com.mydailylife.schedule.ui.components.DeleteScheduleDialog
 import com.mydailylife.schedule.ui.components.MdlFab
+import com.mydailylife.schedule.ui.components.MdlFilterChips
 import com.mydailylife.schedule.ui.components.MdlSearchPill
 import com.mydailylife.schedule.ui.components.PrimaryPillButton
 import com.mydailylife.schedule.ui.components.ScheduleCard
@@ -78,6 +82,9 @@ import com.mydailylife.schedule.ui.theme.OnPrimary
 import com.mydailylife.schedule.ui.theme.OnSoftPrimary
 import com.mydailylife.schedule.ui.theme.Rausch
 import com.mydailylife.schedule.ui.theme.RauschSoft
+import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
+import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
+import com.mydailylife.schedule.ui.theme.ScreenTopPadding
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import java.time.LocalDate
 import java.time.YearMonth
@@ -92,6 +99,7 @@ private data class DayPage(
     val completedItems: List<ScheduleItem>,
     val completedExpanded: Boolean,
     val query: String,
+    val sortMode: ScheduleSortMode,
 )
 
 private data class WeekStripPage(
@@ -116,6 +124,7 @@ fun ScheduleScreen(
         completedItems = uiState.completedItems,
         completedExpanded = uiState.completedExpanded,
         query = uiState.query,
+        sortMode = uiState.sortMode,
     )
     var pendingDelete by remember { mutableStateOf<ScheduleItem?>(null) }
 
@@ -151,20 +160,22 @@ fun ScheduleScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = { MdlFab(onClick = onCreate) },
         containerColor = Canvas,
+        // Root NavHost Scaffold already applied status / nav insets.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = ScreenHorizontalPadding),
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(ScreenTopPadding))
             SectionHeader(
                 title = "日程",
                 action = "通知管理",
                 onAction = onManageReminders,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(ScreenHeaderToContent))
 
             CalendarStrip(
                 uiState = uiState,
@@ -206,6 +217,14 @@ fun ScheduleScreen(
                         onQueryChange = viewModel::onQueryChange,
                         placeholder = "搜索当日事项",
                     )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    MdlFilterChips(
+                        labels = ScheduleSortMode.Labels,
+                        selected = page.sortMode.label,
+                        onSelected = { label ->
+                            viewModel.setSortMode(ScheduleSortMode.fromLabel(label))
+                        },
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if (!hasAnyItems) {
@@ -226,11 +245,20 @@ fun ScheduleScreen(
                             modifier = Modifier.fillMaxSize(),
                         ) {
                             items(page.pendingItems, key = { it.id }) { item ->
+                                val fromCourse = CourseScheduleBridge.isCourseItem(item)
                                 ScheduleCard(
                                     item = item,
-                                    onClick = { onEdit(item.id) },
-                                    onLongClick = { viewModel.toggleCompleted(item.id) },
-                                    onDeleteClick = { pendingDelete = item },
+                                    onClick = if (fromCourse) {
+                                        { viewModel.notifyCourseReadonly() }
+                                    } else {
+                                        { onEdit(item.id) }
+                                    },
+                                    onLongClick = if (fromCourse) null else {
+                                        { viewModel.toggleCompleted(item.id) }
+                                    },
+                                    onDeleteClick = if (fromCourse) null else {
+                                        { pendingDelete = item }
+                                    },
                                 )
                             }
                             if (page.completedItems.isNotEmpty()) {

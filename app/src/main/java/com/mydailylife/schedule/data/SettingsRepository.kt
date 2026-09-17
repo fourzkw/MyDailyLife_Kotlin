@@ -56,8 +56,11 @@ class SettingsRepository(context: Context) {
     suspend fun setDefaultPriority(priority: Priority) =
         update { it.copy(defaultPriority = priority.storageKey) }
 
-    suspend fun setCourseAutoUpdate(enabled: Boolean) =
-        update { it.copy(courseAutoUpdate = enabled) }
+    suspend fun setCourseIcsUrl(url: String) =
+        update { it.copy(courseIcsUrl = url.trim()) }
+
+    suspend fun setScheduleSortMode(mode: ScheduleSortMode) =
+        update { it.copy(scheduleSortMode = mode.storageKey) }
 
     suspend fun addTag(tag: String) {
         val trimmed = tag.trim()

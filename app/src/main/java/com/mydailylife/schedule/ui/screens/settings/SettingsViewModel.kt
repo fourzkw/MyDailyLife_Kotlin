@@ -46,7 +46,7 @@ data class SettingsUiState(
     val reminderBeforeMinutes: Int = 15,
     val defaultPriority: Priority = Priority.Medium,
     val presetTags: List<String> = AppSettings.DefaultPresetTags,
-    val courseAutoUpdate: Boolean = false,
+    val courseIcsUrl: String = "",
     val update: AppUpdateUiState = AppUpdateUiState.Idle,
 ) {
     val reminderLabel: String get() = AppSettings.reminderLabel(reminderBeforeMinutes)
@@ -72,7 +72,7 @@ class SettingsViewModel(
             reminderBeforeMinutes = settings.reminderBeforeMinutes,
             defaultPriority = settings.defaultPriorityEnum,
             presetTags = settings.presetTags,
-            courseAutoUpdate = settings.courseAutoUpdate,
+            courseIcsUrl = settings.courseIcsUrl,
             update = update,
         )
     }.stateIn(
@@ -95,10 +95,6 @@ class SettingsViewModel(
 
     fun setDefaultPriority(priority: Priority) {
         viewModelScope.launch { settingsRepository.setDefaultPriority(priority) }
-    }
-
-    fun setCourseAutoUpdate(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setCourseAutoUpdate(enabled) }
     }
 
     fun addTag(tag: String) {

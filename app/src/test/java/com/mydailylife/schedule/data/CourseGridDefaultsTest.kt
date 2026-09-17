@@ -7,15 +7,20 @@ import java.time.LocalDate
 class CourseGridDefaultsTest {
     @Test
     fun mondayOfMonthWeek_septemberSecond() {
-        // 2025-09-01 is Monday → week 2 Monday = 2025-09-08
+        // 2025-09-01 is Monday → week 1 Mon = 9/1 → week 2 Mon = 9/8
         assertEquals(
             LocalDate.of(2025, 9, 8),
             CourseGridDefaults.mondayOfMonthWeek(2025, 9, 2),
         )
-        // 2024-09-01 is Sunday → first Monday = 2024-09-02 → week 2 = 2024-09-09
+        // 2024-09-01 is Sunday → week 1 Mon = 8/26 → week 2 Mon = 9/2
         assertEquals(
-            LocalDate.of(2024, 9, 9),
+            LocalDate.of(2024, 9, 2),
             CourseGridDefaults.mondayOfMonthWeek(2024, 9, 2),
+        )
+        // 2026-09-01 is Tuesday → week 1 Mon = 8/31 → week 2 Mon = 9/7
+        assertEquals(
+            LocalDate.of(2026, 9, 7),
+            CourseGridDefaults.mondayOfMonthWeek(2026, 9, 2),
         )
     }
 

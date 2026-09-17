@@ -106,15 +106,18 @@ Also bump `versionCode` by **+1** whenever `versionName` changes.
 
 Settings 「版本」 reads `BuildConfig.VERSION_NAME` — never hardcode the string in UI.
 
-**Current:** `1.6.0` / `versionCode` 10 — in-app update check/download/install.
+**Current:** `1.10.2` / `versionCode` 18 — 统一各页顶部高度（Tab SectionHeader + 全屏 MdlTopAppBar）。
+
+用户可见的版本更新说明维护在 `README.md` →「版本更新说明」；发版时同步更新该节与 `update/version.json` 的 `changelog`。
 
 ## Not done / optional later
 
-ICS course import/export, Excel `.xlsx` binary parse,
-fuller course editing.
+ICS course **export**, Excel `.xls`（旧二进制）解析,
+上课提醒.
 
 **Courses:** grid + `CourseStore` (`courses.json`); teaching week swipe filters
-`teachingWeeks`; tap block for detail; import Excel/CSV / 教务 WebView / ICS placeholder;
+`teachingWeeks`; tap block for detail/edit/delete; long-press drag to add;
+import Excel/CSV/xlsx / 教务选校再 WebView / ICS 订阅;
 term start editable (default autumn = Sept week-2 Monday, spring = Feb week-2 Monday).
 
 **Reminders:** `ReminderScheduler` + `AlarmManager` for Once / Daily / Weekly;

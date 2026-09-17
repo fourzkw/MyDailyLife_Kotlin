@@ -25,6 +25,7 @@ import com.mydailylife.schedule.asMdlApp
 import com.mydailylife.schedule.ui.screens.completed.CompletedScreen
 import com.mydailylife.schedule.ui.screens.completed.CompletedViewModel
 import com.mydailylife.schedule.ui.screens.courses.AcademicImportScreen
+import com.mydailylife.schedule.ui.screens.courses.AcademicSchoolPickerScreen
 import com.mydailylife.schedule.ui.screens.courses.CoursesScreen
 import com.mydailylife.schedule.ui.screens.courses.CoursesViewModel
 import com.mydailylife.schedule.ui.screens.create.CreateScreen
@@ -108,7 +109,11 @@ fun MdlNavHost(
         ) {
             composable(Routes.Schedule) {
                 val vm: ScheduleViewModel = viewModel(
-                    factory = ScheduleViewModel.factory(repository),
+                    factory = ScheduleViewModel.factory(
+                        repository,
+                        app.courseRepository,
+                        app.settingsRepository,
+                    ),
                 )
                 ScheduleScreen(
                     onCreate = { navController.navigate(Routes.create()) },
@@ -119,19 +124,37 @@ fun MdlNavHost(
             }
             composable(Routes.Courses) {
                 val vm: CoursesViewModel = viewModel(
-                    factory = CoursesViewModel.factory(app.courseRepository),
+                    factory = CoursesViewModel.factory(
+                        app.courseRepository,
+                        app.settingsRepository,
+                    ),
                 )
                 CoursesScreen(
-                    onAcademicImport = { navController.navigate(Routes.AcademicImport) },
+                    onAcademicImport = { navController.navigate(Routes.AcademicSchoolPicker) },
                     viewModel = vm,
                 )
             }
-            composable(Routes.AcademicImport) {
+            composable(Routes.AcademicSchoolPicker) {
+                AcademicSchoolPickerScreen(
+                    onBack = { navController.popBackStack() },
+                    onSchoolSelected = { school ->
+                        navController.navigate(Routes.academicImport(school.id))
+                    },
+                )
+            }
+            composable(
+                route = Routes.AcademicImport,
+                arguments = listOf(
+                    navArgument("schoolId") { type = NavType.StringType },
+                ),
+            ) { entry ->
+                val schoolId = entry.arguments?.getString("schoolId").orEmpty()
                 AcademicImportScreen(
+                    schoolId = schoolId,
                     courseRepository = app.courseRepository,
                     onBack = { navController.popBackStack() },
                     onImported = {
-                        navController.popBackStack()
+                        navController.popBackStack(Routes.AcademicSchoolPicker, inclusive = true)
                     },
                 )
             }

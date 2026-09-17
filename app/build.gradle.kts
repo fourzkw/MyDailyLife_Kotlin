@@ -24,8 +24,8 @@ android {
         applicationId = "com.mydailylife.schedule"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.6.0"
+        versionCode = 18
+        versionName = "1.10.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(

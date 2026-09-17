@@ -4,24 +4,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,12 +29,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mydailylife.schedule.data.ScheduleItem
 import com.mydailylife.schedule.ui.components.DeleteScheduleDialog
+import com.mydailylife.schedule.ui.components.MdlTopAppBar
 import com.mydailylife.schedule.ui.components.ScheduleCard
-import com.mydailylife.schedule.ui.components.SectionHeader
-import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.PriorityUrgent
-import com.mydailylife.schedule.ui.theme.SurfaceSoft
+import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
+import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,38 +90,28 @@ fun CompletedScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("已完成事项") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+            MdlTopAppBar(
+                title = "已完成事项",
+                onBack = onBack,
+                actions = {
+                    if (uiState.items.isNotEmpty()) {
+                        TextButton(onClick = { showClearConfirm = true }) {
+                            Text("清空", color = PriorityUrgent)
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SurfaceSoft,
-                    titleContentColor = Ink,
-                ),
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = ScreenHorizontalPadding),
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-            SectionHeader(
-                title = "已完成",
-                action = if (uiState.items.isNotEmpty()) "清空" else null,
-                onAction = if (uiState.items.isNotEmpty()) {
-                    { showClearConfirm = true }
-                } else {
-                    null
-                },
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(ScreenHeaderToContent))
             if (uiState.items.isEmpty()) {
                 Text("暂无已完成事项", color = Muted)
             } else {

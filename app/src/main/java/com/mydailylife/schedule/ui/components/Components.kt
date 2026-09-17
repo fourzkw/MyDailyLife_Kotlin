@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,17 +27,22 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -57,6 +64,7 @@ import com.mydailylife.schedule.data.ScheduleTimeMode
 import com.mydailylife.schedule.data.WeekdayLabels
 import com.mydailylife.schedule.ui.theme.Body
 import com.mydailylife.schedule.ui.theme.ButtonShape
+import com.mydailylife.schedule.ui.theme.Canvas
 import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.CompletionProgressEnd
 import com.mydailylife.schedule.ui.theme.CompletionProgressStart
@@ -474,22 +482,60 @@ fun SectionHeader(
     modifier: Modifier = Modifier,
     action: String? = null,
     onAction: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.displaySmall, color = Ink)
-        if (action != null && onAction != null) {
-            Text(
-                text = action,
-                style = MaterialTheme.typography.labelMedium,
-                color = Rausch,
-                modifier = Modifier.clickable(onClick = onAction),
-            )
+        Text(
+            title,
+            style = MaterialTheme.typography.displaySmall,
+            color = Ink,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (action != null && onAction != null) {
+                Text(
+                    text = action,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Rausch,
+                    modifier = Modifier.clickable(onClick = onAction),
+                )
+            }
+            trailing?.invoke()
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MdlTopAppBar(
+    title: String,
+    onBack: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    TopAppBar(
+        title = { Text(title) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+            }
+        },
+        actions = actions,
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Canvas,
+            titleContentColor = Ink,
+            navigationIconContentColor = Ink,
+            actionIconContentColor = Ink,
+        ),
+        // Parent NavHost Scaffold already applied status-bar insets.
+        windowInsets = WindowInsets(0, 0, 0, 0),
+    )
 }
 
 @Composable

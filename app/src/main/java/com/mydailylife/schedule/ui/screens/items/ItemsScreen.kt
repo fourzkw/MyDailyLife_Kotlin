@@ -32,6 +32,9 @@ import com.mydailylife.schedule.ui.components.MdlSearchPill
 import com.mydailylife.schedule.ui.components.ScheduleCard
 import com.mydailylife.schedule.ui.components.SectionHeader
 import com.mydailylife.schedule.ui.theme.Muted
+import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
+import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
+import com.mydailylife.schedule.ui.theme.ScreenTopPadding
 import java.time.LocalDate
 
 @Composable
@@ -82,15 +85,15 @@ fun ItemsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = ScreenHorizontalPadding),
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(ScreenTopPadding))
             SectionHeader(
                 title = "事项",
                 action = "已完成",
                 onAction = onOpenCompleted,
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(ScreenHeaderToContent))
             MdlSearchPill(query = uiState.query, onQueryChange = viewModel::onQueryChange)
             Spacer(modifier = Modifier.height(12.dp))
             MdlFilterChips(

@@ -60,6 +60,9 @@ import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.PillShape
 import com.mydailylife.schedule.ui.theme.Rausch
+import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
+import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
+import com.mydailylife.schedule.ui.theme.ScreenTopPadding
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import com.mydailylife.schedule.ui.theme.SurfaceStrong
 import kotlinx.coroutines.launch
@@ -281,11 +284,11 @@ fun SettingsScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = ScreenHorizontalPadding),
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(ScreenTopPadding))
             SectionHeader(title = "设置")
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(ScreenHeaderToContent))
 
             SettingsGroup(title = "通知") {
                 SettingsRow(
@@ -318,16 +321,6 @@ fun SettingsScreen(
                         "${uiState.presetTags.size} 个预设"
                     },
                     onClick = { dialog = SettingsDialog.Tags },
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            SettingsGroup(title = "课表") {
-                SettingsRow(
-                    title = "自动更新课表",
-                    subtitle = "按间隔刷新 ICS 订阅（导入后续接入）",
-                    checked = uiState.courseAutoUpdate,
-                    onCheckedChange = viewModel::setCourseAutoUpdate,
                 )
             }
 

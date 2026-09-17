@@ -37,6 +37,9 @@ import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.PillShape
 import com.mydailylife.schedule.ui.theme.Rausch
+import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
+import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
+import com.mydailylife.schedule.ui.theme.ScreenTopPadding
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import com.mydailylife.schedule.ui.theme.SurfaceStrong
 import kotlin.math.roundToInt
@@ -53,11 +56,11 @@ fun StatisticsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = ScreenHorizontalPadding),
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(ScreenTopPadding))
         SectionHeader(title = "统计")
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(ScreenHeaderToContent))
 
         Row(
             modifier = Modifier

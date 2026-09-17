@@ -55,6 +55,9 @@ import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.OnPrimary
 import com.mydailylife.schedule.ui.theme.Rausch
+import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
+import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
+import com.mydailylife.schedule.ui.theme.ScreenTopPadding
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -102,15 +105,15 @@ fun CalendarScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = ScreenHorizontalPadding),
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(ScreenTopPadding))
         SectionHeader(
             title = "日历",
             action = "今天",
             onAction = viewModel::goToday,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(ScreenHeaderToContent))
 
         Row(
             modifier = Modifier.fillMaxWidth(),

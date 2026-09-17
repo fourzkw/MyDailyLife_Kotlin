@@ -3,10 +3,14 @@ package com.mydailylife.schedule.ui.screens.schedule
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mydailylife.schedule.data.CourseRepository
+import com.mydailylife.schedule.data.CourseScheduleBridge
 import com.mydailylife.schedule.data.Priority
 import com.mydailylife.schedule.data.ScheduleItem
 import com.mydailylife.schedule.data.ScheduleQuery
 import com.mydailylife.schedule.data.ScheduleRepository
+import com.mydailylife.schedule.data.ScheduleSortMode
+import com.mydailylife.schedule.data.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,11 +32,14 @@ data class ScheduleUiState(
     val completedItems: List<ScheduleItem> = emptyList(),
     val completedExpanded: Boolean = false,
     val query: String = "",
+    val sortMode: ScheduleSortMode = ScheduleSortMode.Comprehensive,
     val message: String? = null,
 )
 
 class ScheduleViewModel(
     private val repository: ScheduleRepository,
+    private val courseRepository: CourseRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     private val selectedDate = MutableStateFlow(LocalDate.now())
     private val monthExpanded = MutableStateFlow(false)
@@ -41,21 +48,32 @@ class ScheduleViewModel(
     private val message = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<ScheduleUiState> = combine(
-        repository.schedules,
+        combine(
+            repository.schedules,
+            courseRepository.store,
+            settingsRepository.settings,
+        ) { schedules, courses, settings ->
+            Triple(schedules, courses, settings)
+        },
         selectedDate,
         monthExpanded,
         query,
         combine(message, completedExpanded) { msg, completedExp -> msg to completedExp },
-    ) { schedules, date, expanded, q, msgAndCompleted ->
+    ) { triple, date, expanded, q, msgAndCompleted ->
+        val (schedules, courseStore, settings) = triple
         val (msg, completedExp) = msgAndCompleted
+        val sortMode = settings.scheduleSortModeEnum
         val month = YearMonth.from(date)
         val week = weekOf(date)
         val keyword = q.trim()
-        val dayItems = ScheduleQuery.itemsForDate(schedules, date).filter { item ->
+        val scheduleDay = schedules.filter { ScheduleQuery.occursOn(it, date) }
+        val courseDay = CourseScheduleBridge.toScheduleItems(courseStore, date)
+        val dayItems = ScheduleQuery.sorted(scheduleDay + courseDay, sortMode).filter { item ->
             if (keyword.isEmpty()) true
             else {
                 item.title.contains(keyword, ignoreCase = true) ||
-                    item.description.contains(keyword, ignoreCase = true)
+                    item.description.contains(keyword, ignoreCase = true) ||
+                    item.tags.any { it.contains(keyword, ignoreCase = true) }
             }
         }
         val dots = buildMap {
@@ -65,6 +83,17 @@ class ScheduleViewModel(
                 if (weekMonth != month && !containsKey(weekDay)) {
                     putAll(ScheduleQuery.dayPrioritiesInMonth(schedules, weekMonth))
                 }
+            }
+            fun markCourseDay(d: LocalDate) {
+                if (CourseScheduleBridge.coursesForDate(courseStore, d).isEmpty()) return
+                val existing = get(d).orEmpty()
+                if (Priority.Medium !in existing) {
+                    put(d, (existing + Priority.Medium).distinct().take(3))
+                }
+            }
+            week.forEach(::markCourseDay)
+            for (day in 1..month.lengthOfMonth()) {
+                markCourseDay(month.atDay(day))
             }
         }
         ScheduleUiState(
@@ -77,12 +106,21 @@ class ScheduleViewModel(
             completedItems = dayItems.filter { it.completed },
             completedExpanded = completedExp,
             query = q,
+            sortMode = sortMode,
             message = msg,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScheduleUiState(weekDates = weekOf(LocalDate.now())))
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        ScheduleUiState(weekDates = weekOf(LocalDate.now())),
+    )
 
     init {
-        viewModelScope.launch { repository.ensureLoaded() }
+        viewModelScope.launch {
+            repository.ensureLoaded()
+            courseRepository.ensureLoaded()
+            settingsRepository.ensureLoaded()
+        }
     }
 
     fun toggleMonthExpanded() {
@@ -137,7 +175,21 @@ class ScheduleViewModel(
         query.value = value
     }
 
+    fun setSortMode(mode: ScheduleSortMode) {
+        viewModelScope.launch {
+            settingsRepository.setScheduleSortMode(mode)
+        }
+    }
+
+    fun notifyCourseReadonly() {
+        message.value = "课程请在课表页查看或编辑"
+    }
+
     fun toggleCompleted(id: String) {
+        if (CourseScheduleBridge.isCourseItem(id)) {
+            message.value = "课程请在课表中管理"
+            return
+        }
         viewModelScope.launch {
             repository.toggleCompleted(id)
             message.value = "状态已更新"
@@ -145,6 +197,10 @@ class ScheduleViewModel(
     }
 
     fun delete(id: String) {
+        if (CourseScheduleBridge.isCourseItem(id)) {
+            message.value = "课程请在课表中删除"
+            return
+        }
         viewModelScope.launch {
             repository.delete(id)
             message.value = "已删除"
@@ -152,6 +208,10 @@ class ScheduleViewModel(
     }
 
     fun deleteOccurrence(id: String, date: LocalDate) {
+        if (CourseScheduleBridge.isCourseItem(id)) {
+            message.value = "课程请在课表中删除"
+            return
+        }
         viewModelScope.launch {
             repository.excludeOccurrence(id, date)
             message.value = "已删除当天"
@@ -168,11 +228,15 @@ class ScheduleViewModel(
             return (0..6).map { monday.plusDays(it.toLong()) }
         }
 
-        fun factory(repository: ScheduleRepository): ViewModelProvider.Factory =
+        fun factory(
+            repository: ScheduleRepository,
+            courseRepository: CourseRepository,
+            settingsRepository: SettingsRepository,
+        ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return ScheduleViewModel(repository) as T
+                    return ScheduleViewModel(repository, courseRepository, settingsRepository) as T
                 }
             }
     }

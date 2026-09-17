@@ -13,16 +13,13 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -30,8 +27,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -47,8 +42,11 @@ import com.mydailylife.schedule.data.CourseItem
 import com.mydailylife.schedule.data.CourseRepository
 import com.mydailylife.schedule.data.academic.AcademicCaptureJs
 import com.mydailylife.schedule.data.academic.AcademicCaptureResult
+import com.mydailylife.schedule.data.academic.AcademicSchoolIds
+import com.mydailylife.schedule.data.academic.AcademicSchools
 import com.mydailylife.schedule.data.academic.AcademicTimetableParser
 import com.mydailylife.schedule.data.academic.CquPortal
+import com.mydailylife.schedule.ui.components.MdlTopAppBar
 import com.mydailylife.schedule.ui.components.PrimaryPillButton
 import com.mydailylife.schedule.ui.theme.Canvas
 import com.mydailylife.schedule.ui.theme.Ink
@@ -62,10 +60,20 @@ import java.util.concurrent.atomic.AtomicReference
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AcademicImportScreen(
+    schoolId: String,
     courseRepository: CourseRepository,
     onBack: () -> Unit,
     onImported: () -> Unit,
 ) {
+    val school = remember(schoolId) { AcademicSchools.findById(schoolId) }
+    if (school == null || schoolId != AcademicSchoolIds.CQU) {
+        UnsupportedSchoolScreen(
+            schoolName = school?.name,
+            onBack = onBack,
+        )
+        return
+    }
+
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var progress by remember { mutableFloatStateOf(0f) }
@@ -163,21 +171,14 @@ fun AcademicImportScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("教务导入") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Canvas,
-                    titleContentColor = Ink,
-                ),
+            MdlTopAppBar(
+                title = "教务导入 · ${school.name}",
+                onBack = onBack,
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
         containerColor = Canvas,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         Column(
             modifier = Modifier
@@ -293,4 +294,32 @@ private fun AcademicWebView(
             onWebViewReady(webView)
         },
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UnsupportedSchoolScreen(
+    schoolName: String?,
+    onBack: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            MdlTopAppBar(title = "教务导入", onBack = onBack)
+        },
+        containerColor = Canvas,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+    ) { padding ->
+        Text(
+            text = if (schoolName.isNullOrBlank()) {
+                "未找到该学校，请返回重新选择"
+            } else {
+                "「$schoolName」暂未接入教务导入"
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = Muted,
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp),
+        )
+    }
 }
