@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,6 +34,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -331,14 +333,119 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
             SettingsGroup(title = "关于") {
+                val updateSubtitle = when (val update = uiState.update) {
+                    AppUpdateUiState.Checking -> "正在检查…"
+                    is AppUpdateUiState.Downloading -> {
+                        if (update.progress < 0f) "正在下载…"
+                        else "正在下载 ${(update.progress * 100).toInt()}%"
+                    }
+                    is AppUpdateUiState.Available -> "发现新版本 ${update.manifest.versionName}"
+                    is AppUpdateUiState.Ready -> "已下载，等待安装"
+                    is AppUpdateUiState.NeedsInstallPermission -> "需要允许安装未知应用"
+                    else -> "点击检查更新"
+                }
                 SettingsRow(
                     title = "版本",
+                    subtitle = updateSubtitle,
                     trailingText = BuildConfig.VERSION_NAME,
+                    onClick = {
+                        when (val update = uiState.update) {
+                            is AppUpdateUiState.Available,
+                            is AppUpdateUiState.Ready,
+                            is AppUpdateUiState.NeedsInstallPermission,
+                            -> Unit
+                            is AppUpdateUiState.Downloading,
+                            AppUpdateUiState.Checking,
+                            -> Unit
+                            else -> viewModel.checkForUpdate()
+                        }
+                    },
                 )
+                if (uiState.update is AppUpdateUiState.Downloading) {
+                    val progress = (uiState.update as AppUpdateUiState.Downloading).progress
+                    if (progress < 0f) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            color = Rausch,
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            color = Rausch,
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(24.dp))
         }
         SnackbarHost(hostState = snackbar, modifier = Modifier.padding(16.dp))
+    }
+
+    when (val update = uiState.update) {
+        is AppUpdateUiState.Available -> {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!update.manifest.force) viewModel.dismissUpdateMessage()
+                },
+                title = { Text("发现新版本 ${update.manifest.versionName}") },
+                text = {
+                    Text(
+                        update.manifest.changelog.ifBlank { "有可用更新，是否下载并安装？" },
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = viewModel::downloadAndInstall) {
+                        Text("下载并安装")
+                    }
+                },
+                dismissButton = if (update.manifest.force) {
+                    null
+                } else {
+                    {
+                        TextButton(onClick = viewModel::dismissUpdateMessage) {
+                            Text("稍后")
+                        }
+                    }
+                },
+            )
+        }
+        is AppUpdateUiState.NeedsInstallPermission -> {
+            AlertDialog(
+                onDismissRequest = { },
+                title = { Text("允许安装应用") },
+                text = {
+                    Text("请允许本应用安装未知来源应用，返回后再点「继续安装」。")
+                },
+                confirmButton = {
+                    TextButton(onClick = viewModel::openInstallPermissionSettings) {
+                        Text("去设置")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = viewModel::downloadAndInstall) {
+                        Text("继续安装")
+                    }
+                },
+            )
+        }
+        AppUpdateUiState.UpToDate -> {
+            LaunchedEffect(update) {
+                snackbar.showSnackbar("已是最新版本")
+                viewModel.dismissUpdateMessage()
+            }
+        }
+        is AppUpdateUiState.Error -> {
+            LaunchedEffect(update.message) {
+                snackbar.showSnackbar(update.message)
+                viewModel.dismissUpdateMessage()
+            }
+        }
+        else -> Unit
     }
 }
 

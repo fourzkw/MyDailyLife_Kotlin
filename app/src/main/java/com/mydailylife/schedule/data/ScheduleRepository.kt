@@ -32,13 +32,7 @@ class ScheduleRepository(context: Context) {
         mutex.withLock {
             if (loaded) return
             val items = withContext(Dispatchers.IO) { readFromDisk() }
-            if (items.isEmpty()) {
-                val seeded = sampleSchedules()
-                writeToDisk(seeded)
-                _schedules.value = seeded
-            } else {
-                _schedules.value = items
-            }
+            _schedules.value = items
             loaded = true
         }
     }
@@ -130,98 +124,5 @@ class ScheduleRepository(context: Context) {
 
     private fun writeToDisk(items: List<ScheduleItem>) {
         file.writeText(json.encodeToString(ListSerializer(ScheduleItem.serializer()), items))
-    }
-
-    private fun sampleSchedules(): List<ScheduleItem> {
-        val now = System.currentTimeMillis()
-        val todayStart = ScheduleTimeFormat.startOfDayMillis()
-        fun atHour(dayOffset: Long, hour: Int, minute: Int = 0): Long {
-            return todayStart + dayOffset * 24 * 60 * 60 * 1000L +
-                hour * 60 * 60 * 1000L + minute * 60 * 1000L
-        }
-        return listOf(
-            ScheduleItem(
-                id = "seed-1",
-                title = "高等数学作业",
-                description = "完成第三章习题 1-12",
-                priority = Priority.Urgent.storageKey,
-                tags = listOf("学习", "作业"),
-                startTimeMillis = atHour(0, 14),
-                endTimeMillis = atHour(0, 16),
-                timeMode = ScheduleTimeMode.Once.storageKey,
-                reminderEnabled = true,
-                createdAtMillis = now,
-                updatedAtMillis = now,
-            ),
-            ScheduleItem(
-                id = "seed-2",
-                title = "项目组周会",
-                description = "同步本周进度",
-                priority = Priority.High.storageKey,
-                tags = listOf("工作"),
-                startTimeMillis = atHour(0, 10),
-                endTimeMillis = atHour(0, 11),
-                timeMode = ScheduleTimeMode.Weekly.storageKey,
-                weekdays = listOf(1, 3, 5),
-                createdAtMillis = now,
-                updatedAtMillis = now,
-            ),
-            ScheduleItem(
-                id = "seed-3",
-                title = "买生活用品",
-                priority = Priority.Low.storageKey,
-                tags = listOf("生活"),
-                timeMode = ScheduleTimeMode.Unlimited.storageKey,
-                createdAtMillis = now,
-                updatedAtMillis = now,
-            ),
-            ScheduleItem(
-                id = "seed-4",
-                title = "英语口语练习",
-                priority = Priority.Medium.storageKey,
-                tags = listOf("学习"),
-                startTimeMillis = atHour(0, 19),
-                endTimeMillis = atHour(0, 20),
-                timeMode = ScheduleTimeMode.Daily.storageKey,
-                createdAtMillis = now,
-                updatedAtMillis = now,
-            ),
-            ScheduleItem(
-                id = "seed-5",
-                title = "春季短途旅行",
-                description = "出发到回家",
-                priority = Priority.Medium.storageKey,
-                tags = listOf("生活"),
-                startTimeMillis = atHour(2, 8),
-                endTimeMillis = atHour(4, 20),
-                timeMode = ScheduleTimeMode.Once.storageKey,
-                createdAtMillis = now,
-                updatedAtMillis = now,
-            ),
-            ScheduleItem(
-                id = "seed-c1",
-                title = "晨跑 5 公里",
-                priority = Priority.Medium.storageKey,
-                tags = listOf("健康"),
-                startTimeMillis = atHour(-1, 7),
-                endTimeMillis = atHour(-1, 8),
-                timeMode = ScheduleTimeMode.Once.storageKey,
-                completed = true,
-                createdAtMillis = now,
-                updatedAtMillis = now,
-            ),
-            ScheduleItem(
-                id = "seed-c2",
-                title = "提交实验报告",
-                priority = Priority.High.storageKey,
-                tags = listOf("学习"),
-                startTimeMillis = atHour(-1, 21),
-                endTimeMillis = atHour(-1, 22),
-                timeMode = ScheduleTimeMode.Once.storageKey,
-                completed = true,
-                createdAtMillis = now,
-                updatedAtMillis = now,
-            ),
-        )
     }
 }

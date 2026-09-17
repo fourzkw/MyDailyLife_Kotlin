@@ -24,10 +24,15 @@ android {
         applicationId = "com.mydailylife.schedule"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.5.1"
+        versionCode = 10
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "UPDATE_MANIFEST_URL",
+            "\"https://raw.githubusercontent.com/fourzkw/MyDailyLife_Kotlin/master/update/version.json\"",
+        )
     }
 
     signingConfigs {

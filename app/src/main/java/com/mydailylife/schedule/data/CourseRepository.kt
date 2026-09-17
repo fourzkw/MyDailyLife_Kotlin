@@ -81,12 +81,7 @@ class CourseRepository(context: Context) {
     }
 
     private fun readFromDisk(): CourseStore {
-        if (!file.exists()) {
-            val seeded = sampleCourses()
-            val store = CourseStore(courses = seeded, maxTeachingWeek = 18)
-            writeToDisk(store)
-            return store
-        }
+        if (!file.exists()) return CourseStore()
         val text = file.readText()
         // New format
         runCatching {
@@ -101,32 +96,6 @@ class CourseRepository(context: Context) {
 
     private fun writeToDisk(store: CourseStore) {
         file.writeText(json.encodeToString(CourseStore.serializer(), store))
-    }
-
-    private fun sampleCourses(): List<CourseItem> {
-        val allWeeks = (1..18).toList()
-        return listOf(
-            CourseItem(
-                "cs1", "高等数学", "张老师", "A101",
-                weekday = 1, startSlot = 1, endSlot = 2,
-                teachingWeeks = allWeeks, teachingWeekLabel = "1-18",
-            ),
-            CourseItem(
-                "cs2", "大学英语", "李老师", "B203",
-                weekday = 2, startSlot = 3, endSlot = 4,
-                teachingWeeks = allWeeks, teachingWeekLabel = "1-18",
-            ),
-            CourseItem(
-                "cs3", "程序设计", "王老师", "C305",
-                weekday = 3, startSlot = 5, endSlot = 7,
-                teachingWeeks = (1..16).toList(), teachingWeekLabel = "1-16",
-            ),
-            CourseItem(
-                "cs4", "线性代数", "赵老师", "A102",
-                weekday = 5, startSlot = 1, endSlot = 2,
-                teachingWeeks = allWeeks, teachingWeekLabel = "1-18",
-            ),
-        )
     }
 
     companion object {
