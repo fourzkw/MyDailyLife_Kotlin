@@ -1,7 +1,7 @@
 {
-  "versionCode": 10,
-  "versionName": "1.6.0",
-  "apkUrl": "https://github.com/fourzkw/MyDailyLife_Kotlin/releases/download/v1.6.0/MyDailyLife-1.6.0.apk",
+  "versionCode": 34,
+  "versionName": "1.14.5",
+  "apkUrl": "https://github.com/fourzkw/MyDailyLife_Kotlin/releases/download/v1.14.5/MyDailyLife-1.14.5.apk",
   "force": false,
-  "changelog": "支持设置页检查更新并下载安装；去掉默认示例日程与课表"
+  "changelog": "新增纸感校园主题与周视图滑动动画；课表支持教务导入、上课提醒、ICS 导出与字号调节；当天课程同步到日程"
 }
