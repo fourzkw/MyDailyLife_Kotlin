@@ -1,4 +1,4 @@
-﻿package com.mydailylife.schedule.ui.components
+package com.mydailylife.schedule.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -44,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -63,26 +64,36 @@ import com.mydailylife.schedule.data.ScheduleTimeFormat
 import com.mydailylife.schedule.data.ScheduleTimeMode
 import com.mydailylife.schedule.data.WeekdayLabels
 import com.mydailylife.schedule.ui.theme.Body
+import com.mydailylife.schedule.ui.theme.BorderStrong
 import com.mydailylife.schedule.ui.theme.ButtonShape
 import com.mydailylife.schedule.ui.theme.Canvas
+import com.mydailylife.schedule.ui.theme.CardOutlined
 import com.mydailylife.schedule.ui.theme.CardShape
+import com.mydailylife.schedule.ui.theme.ChipOutlined
 import com.mydailylife.schedule.ui.theme.CompletionProgressEnd
 import com.mydailylife.schedule.ui.theme.CompletionProgressStart
+import com.mydailylife.schedule.ui.theme.FabShape
 import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
+import com.mydailylife.schedule.ui.theme.MdlChoiceChip
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.MutedSoft
 import com.mydailylife.schedule.ui.theme.OnPrimary
 import com.mydailylife.schedule.ui.theme.OnSoftPrimary
 import com.mydailylife.schedule.ui.theme.PillShape
+import com.mydailylife.schedule.ui.theme.PrimaryButtonOutlined
+import com.mydailylife.schedule.ui.theme.PrimaryButtonShape
 import com.mydailylife.schedule.ui.theme.PriorityHigh
 import com.mydailylife.schedule.ui.theme.PriorityLow
 import com.mydailylife.schedule.ui.theme.PriorityMedium
 import com.mydailylife.schedule.ui.theme.PriorityUrgent
 import com.mydailylife.schedule.ui.theme.Rausch
 import com.mydailylife.schedule.ui.theme.RauschSoft
+import com.mydailylife.schedule.ui.theme.SearchShape
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import com.mydailylife.schedule.ui.theme.SurfaceStrong
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
+import com.mydailylife.schedule.ui.theme.mdlFieldSurface
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -99,12 +110,14 @@ fun MdlSearchPill(
     modifier: Modifier = Modifier,
     placeholder: String = "搜索事项",
 ) {
+    val shape = SearchShape
+    val borderColor = if (CardOutlined) BorderStrong else Hairline
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp)
-            .clip(PillShape)
-            .border(1.dp, Hairline, PillShape)
+            .clip(shape)
+            .border(1.dp, borderColor, shape)
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -146,16 +159,10 @@ fun MdlFilterChips(
         contentPadding = PaddingValues(horizontal = 0.dp),
     ) {
         items(labels) { label ->
-            val isSelected = label == selected
-            Text(
+            MdlChoiceChip(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (isSelected) OnSoftPrimary else Body,
-                modifier = Modifier
-                    .clip(PillShape)
-                    .background(if (isSelected) RauschSoft else SurfaceStrong)
-                    .clickable { onSelected(label) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                selected = label == selected,
+                onClick = { onSelected(label) },
             )
         }
     }
@@ -279,8 +286,7 @@ fun ScheduleCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(SurfaceSoft)
+            .mdlCardSurface()
             .then(
                 if (onClick != null || onLongClick != null || onDeleteClick != null) {
                     Modifier.pointerInput(item.id, item.completed) {
@@ -439,10 +445,19 @@ fun ScheduleCard(
                         Text(
                             text = tag,
                             style = MaterialTheme.typography.labelSmall,
-                            color = Body,
+                            color = if (ChipOutlined) Muted else Body,
                             modifier = Modifier
                                 .clip(PillShape)
-                                .background(SurfaceStrong)
+                                .then(
+                                    if (ChipOutlined) {
+                                        Modifier.border(1.dp, BorderStrong, PillShape)
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                .background(
+                                    if (ChipOutlined) Color.Transparent else SurfaceStrong,
+                                )
                                 .padding(horizontal = 8.dp, vertical = 3.dp),
                         )
                     }
@@ -468,7 +483,7 @@ fun MdlFab(
     FloatingActionButton(
         onClick = onClick,
         modifier = modifier,
-        shape = CircleShape,
+        shape = FabShape,
         containerColor = Rausch,
         contentColor = OnPrimary,
     ) {
@@ -545,16 +560,36 @@ fun PrimaryPillButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val shape = PrimaryButtonShape
+    val outlined = PrimaryButtonOutlined
+    val bg = when {
+        !enabled && outlined -> RauschSoft.copy(alpha = 0.5f)
+        !enabled -> Rausch.copy(alpha = 0.4f)
+        outlined -> RauschSoft
+        else -> Rausch
+    }
+    val fg = when {
+        !enabled && outlined -> OnSoftPrimary.copy(alpha = 0.5f)
+        outlined -> OnSoftPrimary
+        else -> OnPrimary
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp)
-            .clip(PillShape)
-            .background(if (enabled) Rausch else Rausch.copy(alpha = 0.4f))
+            .clip(shape)
+            .then(
+                if (outlined) {
+                    Modifier.border(1.dp, if (enabled) Rausch else Rausch.copy(alpha = 0.35f), shape)
+                } else {
+                    Modifier
+                },
+            )
+            .background(bg)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, color = OnPrimary)
+        Text(text, style = MaterialTheme.typography.labelLarge, color = fg)
     }
 }
 
@@ -630,9 +665,7 @@ fun FormFieldShell(
             cursorBrush = SolidColor(Rausch),
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(ButtonShape)
-                .border(1.dp, Hairline, ButtonShape)
-                .background(MaterialTheme.colorScheme.surface)
+                .mdlFieldSurface(fill = MaterialTheme.colorScheme.surface)
                 .padding(horizontal = 14.dp, vertical = 14.dp),
             decorationBox = { inner ->
                 if (value.isEmpty() && placeholder.isNotEmpty()) {
@@ -644,6 +677,8 @@ fun FormFieldShell(
     }
 }
 
+@Composable
+@ReadOnlyComposable
 fun priorityColor(priority: Priority) = when (priority) {
     Priority.Urgent -> PriorityUrgent
     Priority.High -> PriorityHigh

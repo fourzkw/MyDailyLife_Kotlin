@@ -37,6 +37,7 @@ Legacy screens (`calendar`, `items`, `completed`) may still exist but are not pr
 ## Conventions
 
 - Match existing Compose patterns and soft theme tokens in `ui/theme` (avoid inventing a new palette).
+- Themes: `AppThemeId` + `MdlPalette` / `LocalMdlPalette` + `MdlShapeTokens` / `LocalMdlShapes`; semantic colors and `PillShape`/`CardShape`/`ButtonShape` are `@Composable` getters. Typography also switches per theme. Add new looks as palette + shapes (+ type), not a forked DESIGN.md.
 - Prefer small, focused diffs; do not refactor unrelated modules.
 - Reuse `ScheduleQuery` for filtering/sorting; don’t duplicate day/completed logic in UI.
 - Gestures: `horizontalSwipe` / `verticalSwipe` in `ui/components/Swipe.kt`.
@@ -106,7 +107,7 @@ Also bump `versionCode` by **+1** whenever `versionName` changes.
 
 Settings 「版本」 reads `BuildConfig.VERSION_NAME` — never hardcode the string in UI.
 
-**Current:** `1.13.5` / `versionCode` 28 — 通知管理日期范围可调（默认 7 天）。
+**Current:** `1.14.5` / `versionCode` 34 — 周视图滑动补齐横向动画。
 
 用户可见的版本更新说明维护在 `README.md` →「版本更新说明」。
 

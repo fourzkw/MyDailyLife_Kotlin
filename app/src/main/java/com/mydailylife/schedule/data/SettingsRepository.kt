@@ -71,6 +71,9 @@ class SettingsRepository(context: Context) {
     suspend fun setCourseGridFontLevel(level: Int) =
         update { it.copy(courseGridFontLevel = CourseGridFontScale.coerce(level)) }
 
+    suspend fun setThemeId(themeId: AppThemeId) =
+        update { it.copy(themeId = themeId.storageKey) }
+
     suspend fun addTag(tag: String) {
         val trimmed = tag.trim()
         if (trimmed.isEmpty()) return

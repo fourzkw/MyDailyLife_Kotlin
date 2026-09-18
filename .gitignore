@@ -21,6 +21,9 @@ local.properties
 **/my-table-detail*.json
 /北师大课程表
 
+# Local scratch (theme reference assets, etc.)
+.tmp-bugaoshan/
+
 # keystore
 keystore.properties
 *.jks

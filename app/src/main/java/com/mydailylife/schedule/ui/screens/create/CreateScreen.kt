@@ -1,4 +1,4 @@
-﻿package com.mydailylife.schedule.ui.screens.create
+package com.mydailylife.schedule.ui.screens.create
 
 import android.widget.NumberPicker
 import androidx.compose.foundation.background
@@ -61,18 +61,16 @@ import com.mydailylife.schedule.ui.components.MdlTopAppBar
 import com.mydailylife.schedule.ui.components.PrimaryPillButton
 import com.mydailylife.schedule.ui.components.SettingsRow
 import com.mydailylife.schedule.ui.components.showBriefSnackbar
-import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
+import com.mydailylife.schedule.ui.theme.MdlChoiceChip
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.MutedSoft
-import com.mydailylife.schedule.ui.theme.OnSoftPrimary
 import com.mydailylife.schedule.ui.theme.PillShape
 import com.mydailylife.schedule.ui.theme.PriorityUrgent
 import com.mydailylife.schedule.ui.theme.Rausch
-import com.mydailylife.schedule.ui.theme.RauschSoft
-import com.mydailylife.schedule.ui.theme.SurfaceSoft
-import com.mydailylife.schedule.ui.theme.SurfaceStrong
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
+import com.mydailylife.schedule.ui.theme.mdlFieldSurface
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -314,8 +312,7 @@ fun CreateScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(CardShape)
-                    .background(SurfaceSoft),
+                    .mdlCardSurface(),
             ) {
                 SettingsRow(
                     title = "提醒",
@@ -511,8 +508,7 @@ private fun PickerField(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(PillShape)
-                .background(SurfaceStrong)
+                .mdlFieldSurface()
                 .clickable(onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -655,14 +651,5 @@ private fun ChoiceChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    Text(
-        text = text,
-        color = if (selected) OnSoftPrimary else Ink,
-        style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier
-            .clip(PillShape)
-            .background(if (selected) RauschSoft else SurfaceStrong)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-    )
+    MdlChoiceChip(text = text, selected = selected, onClick = onClick)
 }

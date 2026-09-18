@@ -1,6 +1,5 @@
 package com.mydailylife.schedule.ui.screens.courses
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -23,18 +22,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.mydailylife.schedule.data.academic.AcademicSchool
 import com.mydailylife.schedule.data.academic.AcademicSchools
 import com.mydailylife.schedule.ui.components.MdlTopAppBar
 import com.mydailylife.schedule.ui.components.SettingsRow
+import com.mydailylife.schedule.ui.theme.ButtonShape
 import com.mydailylife.schedule.ui.theme.Canvas
-import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
-import com.mydailylife.schedule.ui.theme.SurfaceSoft
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +63,7 @@ fun AcademicSchoolPickerScreen(
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
+                shape = ButtonShape,
                 placeholder = { Text("搜索学校名称或拼音") },
                 leadingIcon = {
                     Icon(Icons.Outlined.Search, contentDescription = null, tint = Muted)
@@ -99,8 +98,7 @@ fun AcademicSchoolPickerScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(CardShape)
-                                    .background(SurfaceSoft),
+                                    .mdlCardSurface(),
                             ) {
                                 items.forEachIndexed { index, school ->
                                     if (index > 0) HorizontalDivider(color = Hairline)

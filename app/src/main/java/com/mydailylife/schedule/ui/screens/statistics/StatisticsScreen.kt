@@ -1,4 +1,4 @@
-﻿package com.mydailylife.schedule.ui.screens.statistics
+package com.mydailylife.schedule.ui.screens.statistics
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -40,8 +40,8 @@ import com.mydailylife.schedule.ui.theme.Rausch
 import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
 import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
 import com.mydailylife.schedule.ui.theme.ScreenTopPadding
-import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import com.mydailylife.schedule.ui.theme.SurfaceStrong
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
 import kotlin.math.roundToInt
 
 @Composable
@@ -65,8 +65,7 @@ fun StatisticsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(CardShape)
-                .background(SurfaceSoft)
+                .mdlCardSurface()
                 .padding(vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
@@ -80,8 +79,7 @@ fun StatisticsScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(CardShape)
-                .background(SurfaceSoft)
+                .mdlCardSurface()
                 .padding(24.dp),
             contentAlignment = Alignment.Center,
         ) {

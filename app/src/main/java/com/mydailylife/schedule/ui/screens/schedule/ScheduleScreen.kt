@@ -86,7 +86,7 @@ import com.mydailylife.schedule.ui.theme.RauschSoft
 import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
 import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
 import com.mydailylife.schedule.ui.theme.ScreenTopPadding
-import com.mydailylife.schedule.ui.theme.SurfaceSoft
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
@@ -187,7 +187,7 @@ fun ScheduleScreen(
                 onExpand = viewModel::expandMonth,
                 onCollapse = viewModel::collapseMonth,
                 onSelectDate = viewModel::selectDate,
-                onShiftDay = viewModel::shiftDay,
+                onShiftWeek = { delta -> viewModel.shiftDay(delta * 7L) },
             )
 
             AnimatedContent(
@@ -328,16 +328,15 @@ private fun CalendarStrip(
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
-    onShiftDay: (Long) -> Unit,
+    onShiftWeek: (Long) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(SurfaceSoft)
+            .mdlCardSurface()
             .bidirectionalSwipe(
-                onSwipeLeft = { onShiftDay(1) },
-                onSwipeRight = { onShiftDay(-1) },
+                onSwipeLeft = { onShiftWeek(1) },
+                onSwipeRight = { onShiftWeek(-1) },
                 onSwipeUp = if (uiState.monthExpanded) onCollapse else null,
                 onSwipeDown = if (!uiState.monthExpanded) onExpand else null,
             )
@@ -427,13 +426,25 @@ private fun CalendarStrip(
                 }
                 WeekdayHeader()
                 Spacer(modifier = Modifier.height(4.dp))
-                MonthGrid(
-                    month = uiState.month,
-                    today = today,
-                    selectedDate = uiState.selectedDate,
-                    dayDots = uiState.dayDots,
-                    onSelectDate = onSelectDate,
-                )
+                AnimatedContent(
+                    targetState = uiState.month,
+                    contentKey = { it },
+                    transitionSpec = {
+                        horizontalSlideTransition(forward = targetState > initialState)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clipToBounds(),
+                    label = "month-grid",
+                ) { month ->
+                    MonthGrid(
+                        month = month,
+                        today = today,
+                        selectedDate = uiState.selectedDate,
+                        dayDots = uiState.dayDots,
+                        onSelectDate = onSelectDate,
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -669,9 +680,9 @@ private fun AnimatedContentTransitionScope<WeekStripPage>.weekSlideTransition():
 
 private fun horizontalSlideTransition(forward: Boolean): ContentTransform =
     if (forward) {
-        (slideInHorizontally(animationSpec = tween(DaySlideMs)) { it / 3 } + fadeIn(tween(DaySlideMs))) togetherWith
-            (slideOutHorizontally(animationSpec = tween(DaySlideMs)) { -it / 3 } + fadeOut(tween(DaySlideMs)))
+        (slideInHorizontally(animationSpec = tween(DaySlideMs)) { full -> full } + fadeIn(tween(DaySlideMs))) togetherWith
+            (slideOutHorizontally(animationSpec = tween(DaySlideMs)) { full -> -full } + fadeOut(tween(DaySlideMs)))
     } else {
-        (slideInHorizontally(animationSpec = tween(DaySlideMs)) { -it / 3 } + fadeIn(tween(DaySlideMs))) togetherWith
-            (slideOutHorizontally(animationSpec = tween(DaySlideMs)) { it / 3 } + fadeOut(tween(DaySlideMs)))
+        (slideInHorizontally(animationSpec = tween(DaySlideMs)) { full -> -full } + fadeIn(tween(DaySlideMs))) togetherWith
+            (slideOutHorizontally(animationSpec = tween(DaySlideMs)) { full -> full } + fadeOut(tween(DaySlideMs)))
     }

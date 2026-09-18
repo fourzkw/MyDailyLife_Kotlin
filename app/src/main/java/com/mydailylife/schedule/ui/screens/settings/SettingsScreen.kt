@@ -1,10 +1,11 @@
-﻿package com.mydailylife.schedule.ui.screens.settings
+package com.mydailylife.schedule.ui.screens.settings
 
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -50,14 +51,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mydailylife.schedule.BuildConfig
 import com.mydailylife.schedule.asMdlApp
 import com.mydailylife.schedule.data.AppSettings
+import com.mydailylife.schedule.data.AppThemeId
 import com.mydailylife.schedule.data.Priority
 import com.mydailylife.schedule.reminder.ReminderPermission
 import com.mydailylife.schedule.ui.components.SectionHeader
 import com.mydailylife.schedule.ui.components.SettingsRow
 import com.mydailylife.schedule.ui.components.showBriefSnackbar
+import com.mydailylife.schedule.ui.theme.CardOutlined
 import com.mydailylife.schedule.ui.theme.CardShape
+import com.mydailylife.schedule.ui.theme.ChipOutlined
+import com.mydailylife.schedule.ui.theme.BorderStrong
 import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
+import com.mydailylife.schedule.ui.theme.MdlDialogContainer
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.PillShape
 import com.mydailylife.schedule.ui.theme.Rausch
@@ -66,12 +72,14 @@ import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
 import com.mydailylife.schedule.ui.theme.ScreenTopPadding
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import com.mydailylife.schedule.ui.theme.SurfaceStrong
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
 import kotlinx.coroutines.launch
 
 private enum class SettingsDialog {
     Reminder,
     Priority,
     Tags,
+    Theme,
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -135,6 +143,8 @@ fun SettingsScreen(
     if (showOpenSettingsDialog) {
         AlertDialog(
             onDismissRequest = { showOpenSettingsDialog = false },
+            shape = CardShape,
+            containerColor = MdlDialogContainer,
             title = { Text("需要通知权限") },
             text = {
                 Text("请在系统设置中允许通知，以便准时提醒日程。")
@@ -156,6 +166,8 @@ fun SettingsScreen(
     if (showExactAlarmDialog) {
         AlertDialog(
             onDismissRequest = { showExactAlarmDialog = false },
+            shape = CardShape,
+            containerColor = MdlDialogContainer,
             title = { Text("建议开启精确闹钟") },
             text = {
                 Text("系统限制了精确闹钟时，提醒可能略有延迟。可在设置中允许本应用使用闹钟与提醒。")
@@ -201,12 +213,27 @@ fun SettingsScreen(
                 },
             )
         }
+        SettingsDialog.Theme -> {
+            ChoiceDialog(
+                title = "外观主题",
+                options = AppThemeId.entries.map { it to "${it.label} · ${it.subtitle}" },
+                selectedKey = uiState.themeId,
+                onDismiss = { dialog = null },
+                onSelect = { theme ->
+                    viewModel.setThemeId(theme)
+                    dialog = null
+                    scope.launch { snackbar.showBriefSnackbar("已切换为${theme.label}") }
+                },
+            )
+        }
         SettingsDialog.Tags -> {
             AlertDialog(
                 onDismissRequest = {
                     dialog = null
                     newTag = ""
                 },
+                shape = CardShape,
+                containerColor = MdlDialogContainer,
                 title = { Text("标签管理") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -221,7 +248,20 @@ fun SettingsScreen(
                                     Row(
                                         modifier = Modifier
                                             .clip(PillShape)
-                                            .background(SurfaceStrong)
+                                            .then(
+                                                if (ChipOutlined) {
+                                                    Modifier.border(1.dp, BorderStrong, PillShape)
+                                                } else {
+                                                    Modifier
+                                                },
+                                            )
+                                            .background(
+                                                if (ChipOutlined) {
+                                                    androidx.compose.ui.graphics.Color.Transparent
+                                                } else {
+                                                    SurfaceStrong
+                                                },
+                                            )
                                             .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
@@ -303,6 +343,16 @@ fun SettingsScreen(
                     title = "默认提前提醒",
                     trailingText = uiState.reminderLabel,
                     onClick = { dialog = SettingsDialog.Reminder },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            SettingsGroup(title = "外观") {
+                SettingsRow(
+                    title = "主题",
+                    subtitle = uiState.themeId.subtitle,
+                    trailingText = uiState.themeLabel,
+                    onClick = { dialog = SettingsDialog.Theme },
                 )
             }
 
@@ -453,6 +503,8 @@ private fun <T> ChoiceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = CardShape,
+        containerColor = MdlDialogContainer,
         title = { Text(title) },
         text = {
             Column {
@@ -494,8 +546,7 @@ private fun SettingsGroup(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(SurfaceSoft),
+            .mdlCardSurface(),
     ) {
         content()
     }

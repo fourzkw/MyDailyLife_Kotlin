@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.mydailylife.schedule.data.AppSettings
+import com.mydailylife.schedule.data.AppThemeId
 import com.mydailylife.schedule.data.Priority
 import com.mydailylife.schedule.data.SettingsRepository
 import com.mydailylife.schedule.data.update.AppUpdater
@@ -47,10 +48,12 @@ data class SettingsUiState(
     val defaultPriority: Priority = Priority.Medium,
     val presetTags: List<String> = AppSettings.DefaultPresetTags,
     val courseIcsUrl: String = "",
+    val themeId: AppThemeId = AppThemeId.Default,
     val update: AppUpdateUiState = AppUpdateUiState.Idle,
 ) {
     val reminderLabel: String get() = AppSettings.reminderLabel(reminderBeforeMinutes)
     val priorityLabel: String get() = defaultPriority.label
+    val themeLabel: String get() = themeId.label
 }
 
 class SettingsViewModel(
@@ -73,6 +76,7 @@ class SettingsViewModel(
             defaultPriority = settings.defaultPriorityEnum,
             presetTags = settings.presetTags,
             courseIcsUrl = settings.courseIcsUrl,
+            themeId = settings.themeIdEnum,
             update = update,
         )
     }.stateIn(
@@ -95,6 +99,10 @@ class SettingsViewModel(
 
     fun setDefaultPriority(priority: Priority) {
         viewModelScope.launch { settingsRepository.setDefaultPriority(priority) }
+    }
+
+    fun setThemeId(themeId: AppThemeId) {
+        viewModelScope.launch { settingsRepository.setThemeId(themeId) }
     }
 
     fun addTag(tag: String) {

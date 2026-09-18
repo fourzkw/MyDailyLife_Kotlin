@@ -21,12 +21,15 @@ data class AppSettings(
      * 课表网格字号挡位 0–4；默认 [CourseGridFontScale.DEFAULT]（比旧版小一号）.
      */
     val courseGridFontLevel: Int = CourseGridFontScale.DEFAULT,
+    /** Visual theme id — see [AppThemeId]. */
+    val themeId: String = AppThemeId.Default.storageKey,
 ) {
     val defaultPriorityEnum: Priority get() = Priority.fromStorage(defaultPriority)
     val scheduleSortModeEnum: ScheduleSortMode
         get() = ScheduleSortMode.fromStorage(scheduleSortMode)
     val courseGridFontLevelClamped: Int
         get() = CourseGridFontScale.coerce(courseGridFontLevel)
+    val themeIdEnum: AppThemeId get() = AppThemeId.fromStorage(themeId)
 
     companion object {
         val DefaultPresetTags: List<String> =

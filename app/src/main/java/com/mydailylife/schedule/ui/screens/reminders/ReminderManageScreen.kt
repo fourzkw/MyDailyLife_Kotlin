@@ -38,13 +38,11 @@ import com.mydailylife.schedule.data.AppSettings
 import com.mydailylife.schedule.reminder.UpcomingReminder
 import com.mydailylife.schedule.ui.components.MdlTopAppBar
 import com.mydailylife.schedule.ui.theme.Canvas
-import com.mydailylife.schedule.ui.theme.CardShape
-import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.Rausch
 import com.mydailylife.schedule.ui.theme.SurfaceCard
-import com.mydailylife.schedule.ui.theme.SurfaceSoft
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -209,9 +207,7 @@ private fun ReminderRangeBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(SurfaceCard)
-            .border(1.dp, Hairline, CardShape)
+            .mdlCardSurface(fill = SurfaceCard)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Text(
@@ -269,8 +265,7 @@ private fun RangeDateChip(
 ) {
     Column(
         modifier = modifier
-            .clip(CardShape)
-            .background(SurfaceSoft)
+            .mdlCardSurface()
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
@@ -321,8 +316,7 @@ private fun ReminderManageRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(SurfaceSoft)
+            .mdlCardSurface()
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {

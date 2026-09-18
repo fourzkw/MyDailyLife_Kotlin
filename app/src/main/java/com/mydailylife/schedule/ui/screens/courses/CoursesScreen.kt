@@ -1,4 +1,4 @@
-﻿package com.mydailylife.schedule.ui.screens.courses
+package com.mydailylife.schedule.ui.screens.courses
 
 import android.Manifest
 import android.content.Intent
@@ -7,6 +7,15 @@ import android.os.Build
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,6 +58,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,8 +67,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -90,6 +102,8 @@ import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.HairlineSoft
 import com.mydailylife.schedule.ui.theme.Ink
+import com.mydailylife.schedule.ui.theme.MdlBottomSheetShape
+import com.mydailylife.schedule.ui.theme.MdlDialogContainer
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.OnPrimary
 import com.mydailylife.schedule.ui.theme.OnSoftPrimary
@@ -105,6 +119,7 @@ import com.mydailylife.schedule.ui.theme.ScreenTopPadding
 import com.mydailylife.schedule.ui.theme.SurfaceCard
 import com.mydailylife.schedule.ui.theme.SurfaceSoft
 import com.mydailylife.schedule.ui.theme.SurfaceStrong
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
 import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -119,6 +134,13 @@ import kotlinx.coroutines.withContext
 private val TimeGutterWidth = 34.dp
 private val SlotHeight = 42.dp
 private val BreakBandHeight = 4.dp
+private const val WeekSlideMs = 280
+
+private data class CourseWeekPage(
+    val teachingWeek: Int,
+    val weekDates: List<LocalDate>,
+    val courses: List<CourseItem>,
+)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -141,6 +163,11 @@ fun CoursesScreen(
     val weekRange = "${weekStart.format(rangeFormatter)} – ${weekEnd.format(rangeFormatter)}"
     val teachingLabel = "第${uiState.teachingWeek}周"
     val isCurrentWeek = uiState.teachingWeek == currentTeachingWeekHint(uiState)
+    val weekPage = CourseWeekPage(
+        teachingWeek = uiState.teachingWeek,
+        weekDates = weekDates,
+        courses = uiState.visibleCourses,
+    )
 
     var showImportSheet by remember { mutableStateOf(false) }
     var showIcsDialog by remember { mutableStateOf(false) }
@@ -151,6 +178,11 @@ fun CoursesScreen(
     var detailCourse by remember { mutableStateOf<CourseItem?>(null) }
     var draftSlots by remember { mutableStateOf<List<DraftSlot>>(emptyList()) }
     var liveDraft by remember { mutableStateOf<DraftSlot?>(null) }
+
+    LaunchedEffect(uiState.teachingWeek) {
+        draftSlots = emptyList()
+        liveDraft = null
+    }
     var addTarget by remember { mutableStateOf<DraftSlot?>(null) }
     var editCourse by remember { mutableStateOf<CourseItem?>(null) }
     var deleteCourse by remember { mutableStateOf<CourseItem?>(null) }
@@ -344,7 +376,8 @@ fun CoursesScreen(
         ModalBottomSheet(
             onDismissRequest = { showImportSheet = false },
             sheetState = sheetState,
-            containerColor = SurfaceSoft,
+            shape = MdlBottomSheetShape,
+            containerColor = MdlDialogContainer,
         ) {
             Column(modifier = Modifier.padding(bottom = 28.dp)) {
                 Text(
@@ -379,7 +412,8 @@ fun CoursesScreen(
         ModalBottomSheet(
             onDismissRequest = { detailCourse = null },
             sheetState = detailSheetState,
-            containerColor = SurfaceSoft,
+            shape = MdlBottomSheetShape,
+            containerColor = MdlDialogContainer,
         ) {
             CourseDetailContent(
                 course = course,
@@ -466,7 +500,8 @@ fun CoursesScreen(
         ModalBottomSheet(
             onDismissRequest = { showCourseSettings = false },
             sheetState = settingsSheetState,
-            containerColor = SurfaceSoft,
+            shape = MdlBottomSheetShape,
+            containerColor = MdlDialogContainer,
         ) {
             CourseSettingsSheet(
                 termStartDate = uiState.termStartDate,
@@ -587,44 +622,52 @@ fun CoursesScreen(
             )
 
             Spacer(modifier = Modifier.height(12.dp))
-            Column(
+            AnimatedContent(
+                targetState = weekPage,
+                contentKey = { it.teachingWeek },
+                transitionSpec = { courseWeekSlideTransition() },
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .clip(CardShape)
-                    .background(SurfaceCard)
-                    .border(1.dp, HairlineSoft, CardShape)
-                    .padding(top = 10.dp, bottom = 8.dp),
-            ) {
-                WeekdayHeaderRow(weekDates = weekDates, today = today)
-                Spacer(modifier = Modifier.height(6.dp))
-                HorizontalDivider(color = HairlineSoft)
+                    .clipToBounds(),
+                label = "course-week",
+            ) { page ->
                 Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(bottom = 4.dp),
+                        .fillMaxSize()
+                        .mdlCardSurface(fill = SurfaceCard)
+                        .padding(top = 10.dp, bottom = 8.dp),
                 ) {
-                    CourseGrid(
-                        courses = uiState.visibleCourses,
-                        weekDates = weekDates,
-                        today = today,
-                        periodSchedule = uiState.periodSchedule,
-                        fontLevel = uiState.courseGridFontLevel,
-                        slotHeight = SlotHeight,
-                        draftSlots = draftSlots,
-                        liveDraft = liveDraft,
-                        onLiveDraftChange = { liveDraft = it },
-                        onDraftCommitted = { draft ->
-                            draftSlots = mergeDraftSlot(draftSlots, draft)
-                            liveDraft = null
-                        },
-                        onDraftClick = { addTarget = it },
-                        onDraftRemove = { draft ->
-                            draftSlots = draftSlots.filterNot { it == draft }
-                        },
-                        onCourseClick = { detailCourse = it },
-                    )
+                    WeekdayHeaderRow(weekDates = page.weekDates, today = today)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    HorizontalDivider(color = HairlineSoft)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                            .padding(bottom = 4.dp),
+                    ) {
+                        CourseGrid(
+                            courses = page.courses,
+                            weekDates = page.weekDates,
+                            today = today,
+                            periodSchedule = uiState.periodSchedule,
+                            fontLevel = uiState.courseGridFontLevel,
+                            slotHeight = SlotHeight,
+                            draftSlots = draftSlots,
+                            liveDraft = liveDraft,
+                            onLiveDraftChange = { liveDraft = it },
+                            onDraftCommitted = { draft ->
+                                draftSlots = mergeDraftSlot(draftSlots, draft)
+                                liveDraft = null
+                            },
+                            onDraftClick = { addTarget = it },
+                            onDraftRemove = { draft ->
+                                draftSlots = draftSlots.filterNot { it == draft }
+                            },
+                            onCourseClick = { detailCourse = it },
+                        )
+                    }
                 }
             }
 
@@ -935,13 +978,7 @@ private fun WeekNavigatorCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(if (isCurrentWeek) RauschSoft else SurfaceStrong)
-            .border(
-                1.dp,
-                if (isCurrentWeek) Rausch.copy(alpha = 0.22f) else HairlineSoft,
-                CardShape,
-            )
+            .mdlCardSurface(fill = if (isCurrentWeek) RauschSoft else SurfaceStrong)
             .padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1364,6 +1401,8 @@ private data class CourseBlockPalette(
     val accent: Color,
 )
 
+@Composable
+@ReadOnlyComposable
 private fun courseBlockColors(course: CourseItem): CourseBlockPalette {
     val accents = listOf(
         Rausch,
@@ -1374,19 +1413,11 @@ private fun courseBlockColors(course: CourseItem): CourseBlockPalette {
         Color(0xFF8BB8FF),
         Color(0xFFB39DDB),
     )
-    val fills = listOf(
-        RauschSoft,
-        Color(0xFFFFF0F3),
-        Color(0xFFFFF4EC),
-        Color(0xFFFFF8E8),
-        Color(0xFFEDF8F0),
-        Color(0xFFEEF4FF),
-        Color(0xFFF5F0FB),
-    )
     val idx = abs(course.title.hashCode()) % accents.size
     val accent = accents[idx]
+    val base = SurfaceCard
     return CourseBlockPalette(
-        background = fills[idx],
+        background = lerp(base, accent, 0.14f),
         border = accent.copy(alpha = 0.28f),
         accent = accent.copy(alpha = 0.85f),
     )
@@ -1441,6 +1472,17 @@ private fun DetailRow(label: String, value: String) {
             modifier = Modifier.width(72.dp),
         )
         Text(text = value, style = MaterialTheme.typography.bodyMedium, color = Ink)
+    }
+}
+
+private fun AnimatedContentTransitionScope<CourseWeekPage>.courseWeekSlideTransition(): ContentTransform {
+    val forward = targetState.teachingWeek > initialState.teachingWeek
+    return if (forward) {
+        (slideInHorizontally(animationSpec = tween(WeekSlideMs)) { it } + fadeIn(tween(WeekSlideMs))) togetherWith
+            (slideOutHorizontally(animationSpec = tween(WeekSlideMs)) { -it } + fadeOut(tween(WeekSlideMs)))
+    } else {
+        (slideInHorizontally(animationSpec = tween(WeekSlideMs)) { -it } + fadeIn(tween(WeekSlideMs))) togetherWith
+            (slideOutHorizontally(animationSpec = tween(WeekSlideMs)) { it } + fadeOut(tween(WeekSlideMs)))
     }
 }
 

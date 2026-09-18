@@ -1,4 +1,4 @@
-﻿package com.mydailylife.schedule.ui.screens.calendar
+package com.mydailylife.schedule.ui.screens.calendar
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -59,7 +59,7 @@ import com.mydailylife.schedule.ui.theme.Rausch
 import com.mydailylife.schedule.ui.theme.ScreenHeaderToContent
 import com.mydailylife.schedule.ui.theme.ScreenHorizontalPadding
 import com.mydailylife.schedule.ui.theme.ScreenTopPadding
-import com.mydailylife.schedule.ui.theme.SurfaceSoft
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -160,8 +160,7 @@ fun CalendarScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(MaterialTheme.shapes.medium)
-                .background(SurfaceSoft)
+                .mdlCardSurface()
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {

@@ -31,11 +31,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.mydailylife.schedule.data.CoursePeriod
 import com.mydailylife.schedule.data.CoursePeriodSchedule
-import com.mydailylife.schedule.ui.theme.CardShape
 import com.mydailylife.schedule.ui.theme.Hairline
 import com.mydailylife.schedule.ui.theme.Ink
 import com.mydailylife.schedule.ui.theme.Muted
 import com.mydailylife.schedule.ui.theme.SurfaceCard
+import com.mydailylife.schedule.ui.theme.mdlCardSurface
 import java.time.LocalTime
 
 @Composable
@@ -58,9 +58,7 @@ fun CoursePeriodScheduleEditor(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(280.dp)
-                .clip(CardShape)
-                .background(SurfaceCard)
-                .border(1.dp, Hairline, CardShape)
+                .mdlCardSurface(fill = SurfaceCard)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
